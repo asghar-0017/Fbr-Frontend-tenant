@@ -2,7 +2,13 @@ import { Box, FormControl, InputLabel, MenuItem, Select } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import { fetchData } from "../API/GetApi";
 
-const SROScheduleNumber = ({ index, item, handleItemChange, RateId }) => {
+const SROScheduleNumber = ({
+  index,
+  item,
+  handleItemChange,
+  RateId,
+  disabled,
+}) => {
   const [sro, setSro] = useState([]);
 
   const getSRO = async () => {
@@ -33,11 +39,14 @@ const SROScheduleNumber = ({ index, item, handleItemChange, RateId }) => {
       localStorage.setItem("SROId", selectedSROObj.srO_ID);
       console.log(`SAVED SROId: ${selectedSROObj.srO_ID} to localStorage`);
     }
+    if (sro.length === 0) {
+      localStorage.removeItem("SROId");
+    }
     handleItemChange(index, "sroScheduleNo", selectedSRO);
   };
   return (
     <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
-      <FormControl fullWidth>
+      <FormControl fullWidth disabled={disabled}>
         <InputLabel id={`sro-schedule-${index}`}>SRO Schedule No</InputLabel>
         <Select
           labelId={`sro-schedule-${index}`}

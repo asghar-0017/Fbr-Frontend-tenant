@@ -2,11 +2,14 @@ import React, { useState, useEffect } from "react";
 import { Box, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
 import { fetchData } from "../API/GetApi";
 
-const RateSelector = ({ index, item, handleItemChange,transactionTypeId }) => {
+const RateSelector = ({ index, item, handleItemChange, transactionTypeId }) => {
   const [rates, setRates] = useState([]);
 
   // Function to fetch rate data
   const getRateData = async () => {
+    if (!transactionTypeId) {
+      return null;
+    }
     try {
       var transctionId = localStorage.getItem("transactionTypeId");
       const response = await fetchData(

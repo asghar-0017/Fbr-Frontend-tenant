@@ -19,6 +19,7 @@ import { fetchData } from "../API/GetApi";
 import RateSelector from "../component/RateSelector";
 import SROScheduleNumber from "../component/SROScheduleNumber";
 import SROItem from "../component/SROItem";
+import UnitOfMeasurement from "../component/UnitOfMeasurement";
 
 export default function CreateInvoice() {
   const [formData, setFormData] = React.useState({
@@ -50,6 +51,8 @@ export default function CreateInvoice() {
         sroScheduleNo: "",
         sroItemSerialNo: "",
         salesType: "",
+        isSROScheduleEnabled: false,
+        isSROItemEnabled: false,
       },
     ],
   });
@@ -66,7 +69,50 @@ export default function CreateInvoice() {
   const handleItemChange = (index, field, value) => {
     setFormData((prev) => {
       const updatedItems = [...prev.items];
-      updatedItems[index] = { ...updatedItems[index], [field]: value };
+      const item = { ...updatedItems[index], [field]: value };
+
+      // Enable SRO Schedule if Rate is entered
+      if (field === "rate" && value) {
+        item.isSROScheduleEnabled = true;
+        item.sroScheduleNo = "";
+        item.sroItemSerialNo = "";
+        item.isSROItemEnabled = false;
+      }
+
+      // ✅ Enable SRO Item if SRO Schedule is entered
+      if (field === "sroScheduleNo" && value) {
+        item.isSROItemEnabled = true;
+        item.sroItemSerialNo = ""; // Reset previously selected item if any
+      }
+
+      // Parse rate as fraction
+      let rateFraction = 0;
+      if (item.rate) {
+        rateFraction = parseFloat(item.rate.replace("%", "")) / 100;
+      }
+
+      // Parse Unit Cost and Quantity
+      const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
+      const quantity = parseFloat(item.quantity || 0);
+
+      // CALCULATION only if Unit Cost and Quantity are filled
+      if (
+        (field === "fixedNotifiedValueOrRetailPrice" || field === "quantity") &&
+        unitCost > 0 &&
+        quantity > 0
+      ) {
+        const valueSales = unitCost * quantity;
+        const salesTax = valueSales * rateFraction;
+        const totalValues = valueSales + salesTax;
+        const withheld = salesTax * 0.1; // 10% withholding
+
+        item.valueSalesExcludingST = valueSales.toFixed(2);
+        item.salesTaxApplicable = salesTax.toFixed(2);
+        item.totalValues = totalValues.toFixed(2);
+        item.salesTaxWithheldAtSource = withheld.toFixed(2);
+      }
+
+      updatedItems[index] = item;
       return { ...prev, items: updatedItems };
     });
   };
@@ -131,6 +177,10 @@ export default function CreateInvoice() {
     }
 
     const localDescription = selectedScenario.saleType;
+    const productDescription = localStorage.setItem(
+      "productDescription",
+      selectedScenario.description
+    );
     const matchingApiRecord = scenario.find(
       (item) =>
         item.transactioN_DESC &&
@@ -139,7 +189,6 @@ export default function CreateInvoice() {
     );
 
     if (matchingApiRecord) {
-      // 3️⃣ If match found, save ID in localStorage
       localStorage.setItem(
         "transactionTypeId",
         matchingApiRecord.transactioN_TYPE_ID
@@ -155,7 +204,15 @@ export default function CreateInvoice() {
       setFormData((prev) => ({
         ...prev,
         scenarioId: id,
-        scenarioDescription: matchingApiRecord.transactioN_DESC,
+        scenarioDescription: matchingApiRecord?.transactioN_DESC ?? "",
+        items: prev.items.map((item) => ({
+          ...item,
+          sroScheduleNo: "",
+          sroItemSerialNo: "",
+          rate: "",
+        })),
+        isSROScheduleEnabled: false,
+        isSROItemEnabled: false,
       }));
     } else {
       // No match ➜ clear or leave as is
@@ -451,6 +508,7 @@ export default function CreateInvoice() {
             <SROItem
               key={`SROItem-${index}`}
               index={index}
+              disabled={!item.isSROItemEnabled}
               item={item}
               handleItemChange={handleItemChange}
               SROId={localStorage.getItem("SROId")}
@@ -460,6 +518,7 @@ export default function CreateInvoice() {
               key={`SROScheduleNumber-${index}`}
               index={index}
               item={item}
+              disabled={!item.isSROScheduleEnabled}
               handleItemChange={handleItemChange}
               RateId={localStorage.getItem("selectedRateId")}
             />
@@ -486,35 +545,26 @@ export default function CreateInvoice() {
               <TextField
                 fullWidth
                 label="Product Description"
-                value={item.productDescription}
+                value={localStorage.getItem("productDescription") || ""}
                 onChange={(e) =>
                   handleItemChange(index, "productDescription", e.target.value)
                 }
+                InputProps={{
+                  readOnly: true,
+                }}
                 variant="outlined"
               />
             </Box>
           </Box>
 
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 2 }}>
-            <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
-              <FormControl fullWidth>
-                <InputLabel id={`uom-${index}`}>
-                  Unit of Measure (UoM)
-                </InputLabel>
-                <Select
-                  labelId={`uom-${index}`}
-                  value={item.uoM}
-                  label="Unit of Measure (UoM)"
-                  onChange={(e) =>
-                    handleItemChange(index, "uoM", e.target.value)
-                  }
-                >
-                  <MenuItem value="">
-                    <em>-- Select UOM --</em>
-                  </MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
+            <UnitOfMeasurement
+              key={`UnitOfMeasurement-${index}`}
+              index={index}
+              item={item}
+              handleItemChange={handleItemChange}
+              hsCode="0304.5400"
+            />
 
             <RateSelector
               key={`RateSelector-${index}`}
@@ -570,6 +620,7 @@ export default function CreateInvoice() {
                   )
                 }
                 variant="outlined"
+                InputProps={{ readOnly: true }}
               />
             </Box>
 
@@ -583,6 +634,7 @@ export default function CreateInvoice() {
                   handleItemChange(index, "salesTaxApplicable", e.target.value)
                 }
                 variant="outlined"
+                InputProps={{ readOnly: true }}
               />
             </Box>
 
@@ -596,6 +648,7 @@ export default function CreateInvoice() {
                   handleItemChange(index, "totalValues", e.target.value)
                 }
                 variant="outlined"
+                InputProps={{ readOnly: true }}
               />
             </Box>
           </Box>
@@ -615,6 +668,7 @@ export default function CreateInvoice() {
                   )
                 }
                 variant="outlined"
+                InputProps={{ readOnly: true }}
               />
             </Box>
           </Box>
@@ -625,10 +679,13 @@ export default function CreateInvoice() {
                 fullWidth
                 label="Sales Type"
                 type="text"
-                value={item.salesType}
+                value={localStorage.getItem("salesType") || ""}
                 onChange={(e) =>
                   handleItemChange(index, "salesType", e.target.value)
                 }
+                InputProps={{
+                  readOnly: true,
+                }}
                 variant="outlined"
               />
             </Box>
