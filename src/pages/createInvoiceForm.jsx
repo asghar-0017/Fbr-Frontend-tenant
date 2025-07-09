@@ -16,6 +16,9 @@ import Button from "@mui/material/Button";
 import dayjs from "dayjs";
 import { scenarioData } from "../component/ScnerioData";
 import { fetchData } from "../API/GetApi";
+import RateSelector from "../component/RateSelector";
+import SROScheduleNumber from "../component/SROScheduleNumber";
+import SROItem from "../component/SROItem";
 
 export default function CreateInvoice() {
   const [formData, setFormData] = React.useState({
@@ -34,7 +37,7 @@ export default function CreateInvoice() {
     scenarioId: "SN001",
     items: [
       {
-        hsCode: "",
+        hsCode: "0304.5400",
         productDescription: "",
         rate: "18.00%",
         uoM: "",
@@ -46,6 +49,7 @@ export default function CreateInvoice() {
         salesTaxWithheldAtSource: "",
         sroScheduleNo: "",
         sroItemSerialNo: "",
+        salesType: "",
       },
     ],
   });
@@ -112,6 +116,57 @@ export default function CreateInvoice() {
   React.useEffect(() => {
     getScenarioData();
   }, []);
+
+  const handleScenarioChange = (id) => {
+    const selectedScenario = scenarioData.find((item) => item.id === id);
+
+    if (!selectedScenario) {
+      // Id invalid, clear
+      setFormData((prev) => ({
+        ...prev,
+        scenarioId: id,
+        scenarioDescription: "",
+      }));
+      return;
+    }
+
+    const localDescription = selectedScenario.saleType;
+    const matchingApiRecord = scenario.find(
+      (item) =>
+        item.transactioN_DESC &&
+        item.transactioN_DESC.trim().toLowerCase() ===
+          localDescription.trim().toLowerCase()
+    );
+
+    if (matchingApiRecord) {
+      // 3️⃣ If match found, save ID in localStorage
+      localStorage.setItem(
+        "transactionTypeId",
+        matchingApiRecord.transactioN_TYPE_ID
+      );
+      localStorage.setItem("salesType", matchingApiRecord.transactioN_DESC);
+
+      console.log(
+        "Transaction type ID saved:",
+        matchingApiRecord.transactioN_TYPE_ID
+      );
+
+      // 4️⃣ Also update your formData with description
+      setFormData((prev) => ({
+        ...prev,
+        scenarioId: id,
+        scenarioDescription: matchingApiRecord.transactioN_DESC,
+      }));
+    } else {
+      // No match ➜ clear or leave as is
+      console.warn("No matching description found in API");
+      setFormData((prev) => ({
+        ...prev,
+        scenarioId: id,
+        scenarioDescription: "",
+      }));
+    }
+  };
 
   return (
     <Box sx={{ p: 3, backgroundColor: "#f0f2f5", borderRadius: 2, mt: 8 }}>
@@ -350,22 +405,7 @@ export default function CreateInvoice() {
                 name="scenarioId"
                 value={formData.scenarioId ?? ""}
                 label="Scenario"
-                onChange={(e) => {
-                  const selectedId = e.target.value;
-                  const selectedScenario = scenarioData.find(
-                    (item) => item.id === selectedId
-                  );
-                  setFormData((prev) => ({
-                    ...prev,
-                    scenarioId: selectedId,
-                    scenarioDescription: selectedScenario?.saleType ?? "",
-                  }));
-
-                  console.log(
-                    "scenarioDescriptionscenarioDescriptionscenarioDescription: ",
-                    selectedScenario?.saleType
-                  );
-                }}
+                onChange={(e) => handleScenarioChange(e.target.value)}
               >
                 <MenuItem value="">
                   <em>Select a scenario</em>
@@ -408,43 +448,21 @@ export default function CreateInvoice() {
           }}
         >
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 2 }}>
-            <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
-              <FormControl fullWidth>
-                <InputLabel id={`sro-item-${index}`}>SRO Item #</InputLabel>
-                <Select
-                  labelId={`sro-item-${index}`}
-                  value={item.sroItemSerialNo}
-                  label="SRO Item #"
-                  onChange={(e) =>
-                    handleItemChange(index, "sroItemSerialNo", e.target.value)
-                  }
-                >
-                  <MenuItem value="">
-                    <em>Select SF</em>
-                  </MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
+            <SROItem
+              key={`SROItem-${index}`}
+              index={index}
+              item={item}
+              handleItemChange={handleItemChange}
+              SROId={localStorage.getItem("SROId")}
+            />
 
-            <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
-              <FormControl fullWidth>
-                <InputLabel id={`sro-schedule-${index}`}>
-                  SRO Schedule No
-                </InputLabel>
-                <Select
-                  labelId={`sro-schedule-${index}`}
-                  value={item.sroScheduleNo}
-                  label="SRO Schedule No"
-                  onChange={(e) =>
-                    handleItemChange(index, "sroScheduleNo", e.target.value)
-                  }
-                >
-                  <MenuItem value="">
-                    <em>Select SRO Schedule</em>
-                  </MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
+            <SROScheduleNumber
+              key={`SROScheduleNumber-${index}`}
+              index={index}
+              item={item}
+              handleItemChange={handleItemChange}
+              RateId={localStorage.getItem("selectedRateId")}
+            />
 
             <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
               <FormControl fullWidth>
@@ -457,8 +475,8 @@ export default function CreateInvoice() {
                     handleItemChange(index, "hsCode", e.target.value)
                   }
                 >
-                  <MenuItem value="">
-                    <em>Select HS</em>
+                  <MenuItem value={item.hsCode}>
+                    <em>0304.5400</em>
                   </MenuItem>
                 </Select>
               </FormControl>
@@ -498,23 +516,13 @@ export default function CreateInvoice() {
               </FormControl>
             </Box>
 
-            <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
-              <FormControl fullWidth>
-                <InputLabel id={`rate-${index}`}>Rate</InputLabel>
-                <Select
-                  labelId={`rate-${index}`}
-                  value={item.rate}
-                  label="Rate"
-                  onChange={(e) =>
-                    handleItemChange(index, "rate", e.target.value)
-                  }
-                >
-                  <MenuItem value="18.00%">18.00%</MenuItem>
-                  <MenuItem value="17.00%">17.00%</MenuItem>
-                  <MenuItem value="0.00%">0.00%</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
+            <RateSelector
+              key={`RateSelector-${index}`}
+              index={index}
+              item={item}
+              handleItemChange={handleItemChange}
+              transactionTypeId={localStorage.getItem("transactionTypeId")}
+            />
           </Box>
 
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
@@ -605,6 +613,21 @@ export default function CreateInvoice() {
                     "salesTaxWithheldAtSource",
                     e.target.value
                   )
+                }
+                variant="outlined"
+              />
+            </Box>
+          </Box>
+
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mt: 2 }}>
+            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+              <TextField
+                fullWidth
+                label="Sales Type"
+                type="text"
+                value={item.salesType}
+                onChange={(e) =>
+                  handleItemChange(index, "salesType", e.target.value)
                 }
                 variant="outlined"
               />
