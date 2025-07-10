@@ -21,49 +21,51 @@ import SROScheduleNumber from "../component/SROScheduleNumber";
 import SROItem from "../component/SROItem";
 import UnitOfMeasurement from "../component/UnitOfMeasurement";
 import Swal from "sweetalert2";
+import { printInvoice } from './PrintTable'; // Corrected import path
 
 export default function CreateInvoice() {
   const [formData, setFormData] = React.useState({
-    invoiceType: "Sale Invoice",
-    invoiceDate: dayjs("2025-07-02"),
-    sellerNTNCNIC: "7458525",
-    sellerBusinessName: "IBL",
-    sellerProvince: "Sindh",
-    sellerAddress: "Karachi",
+    invoiceType: "",
+    invoiceDate: dayjs(),
+    sellerNTNCNIC: "",
+    sellerBusinessName: "",
+    sellerProvince: "",
+    sellerAddress: "",
     buyerNTNCNIC: "",
     buyerBusinessName: "",
-    buyerProvince: "AZAD JAMMU AND KASHMIR",
+    buyerProvince: "",
     buyerAddress: "",
-    buyerRegistrationType: "Registered",
+    buyerRegistrationType: "",
     invoiceRefNo: "",
-    scenarioId: "SN001",
+    scenarioId: "",
     items: [
       {
         hsCode: "0304.5400",
         productDescription: "",
-        rate: "18.00%",
+        rate: "",
         uoM: "",
-        quantity: "",
-        totalValues: "",
-        valueSalesExcludingST: "",
-        fixedNotifiedValueOrRetailPrice: "",
-        salesTaxApplicable: "",
-        salesTaxWithheldAtSource: "",
+        quantity: 1,
+        totalValues: 0,
+        valueSalesExcludingST: 0,
+        fixedNotifiedValueOrRetailPrice: 0,
+        salesTaxApplicable: 0,
+        salesTaxWithheldAtSource: 0,
         sroScheduleNo: "",
         sroItemSerialNo: "",
-        salesType: "",
+        saleType: "",
         isSROScheduleEnabled: false,
         isSROItemEnabled: false,
         extraTax: "",
-        furtherTax: "",
-        fedPayable: "",
-        discount: "",
+        furtherTax: 0,
+        fedPayable: 0,
+        discount: 0,
       },
     ],
   });
 
   const [scenario, setScenario] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
+  const [isPrintable, setIsPrintable] = React.useState(false);
 
   const handleChange = (name, value) => {
     setFormData((prev) => ({
@@ -77,7 +79,6 @@ export default function CreateInvoice() {
       const updatedItems = [...prev.items];
       const item = { ...updatedItems[index], [field]: value };
 
-      // Enable SRO Schedule if Rate is entered
       if (field === "rate" && value) {
         item.isSROScheduleEnabled = true;
         item.sroScheduleNo = "";
@@ -85,23 +86,15 @@ export default function CreateInvoice() {
         item.isSROItemEnabled = false;
       }
 
-      // ✅ Enable SRO Item if SRO Schedule is entered
       if (field === "sroScheduleNo" && value) {
         item.isSROItemEnabled = true;
-        item.sroItemSerialNo = ""; // Reset previously selected item if any
+        item.sroItemSerialNo = "";
       }
 
-      // Parse rate as fraction
-      let rateFraction = 0;
-      if (item.rate) {
-        rateFraction = parseFloat(item.rate.replace("%", "")) / 100;
-      }
-
-      // Parse Unit Cost and Quantity
+      let rateFraction = parseFloat((item.rate || "0").replace("%", "")) / 100;
       const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
       const quantity = parseFloat(item.quantity || 0);
 
-      // CALCULATION only if Unit Cost and Quantity are filled
       if (
         (field === "fixedNotifiedValueOrRetailPrice" ||
           field === "quantity" ||
@@ -113,15 +106,14 @@ export default function CreateInvoice() {
         const valueSales = unitCost * quantity;
         const salesTax = valueSales * rateFraction;
         const totalValues = valueSales + salesTax;
-        const withheld = salesTax * 0.1; // 10% withholding
+        const withheld = salesTax;
 
-        item.valueSalesExcludingST = valueSales.toFixed(2);
-        item.salesTaxApplicable = salesTax.toFixed(2);
-        item.totalValues = totalValues.toFixed(2);
-        item.salesTaxWithheldAtSource = withheld.toFixed(2);
+        item.valueSalesExcludingST = unitCost;
+        item.salesTaxApplicable = salesTax;
+        item.totalValues = totalValues;
+        item.salesTaxWithheldAtSource = withheld;
 
-        // new fields
-        item.extraTax = 0;
+        item.extraTax = "";
         item.furtherTax = 0;
         item.fedPayable = 0;
         item.discount = 0;
@@ -142,18 +134,18 @@ export default function CreateInvoice() {
           productDescription: "",
           rate: "18.00%",
           uoM: "",
-          quantity: "",
-          totalValues: "",
-          valueSalesExcludingST: "",
-          fixedNotifiedValueOrRetailPrice: "",
-          salesTaxApplicable: "",
-          salesTaxWithheldAtSource: "",
+          quantity: 1,
+          totalValues: 0,
+          valueSalesExcludingST: 0,
+          fixedNotifiedValueOrRetailPrice: 0,
+          salesTaxApplicable: 0,
+          salesTaxWithheldAtSource: 0,
           sroScheduleNo: "",
           sroItemSerialNo: "",
           extraTax: "",
-          furtherTax: "",
-          fedPayable: "",
-          discount: "",
+          furtherTax: 0,
+          fedPayable: 0,
+          discount: 0,
           saleType: "",
           isSROScheduleEnabled: false,
           isSROItemEnabled: false,
@@ -173,9 +165,7 @@ export default function CreateInvoice() {
     localStorage.setItem("token", "63f756ee-69e4-3b5b-a3b7-0b8656624912");
     try {
       const res = await fetchData("pdi/v1/transtypecode");
-      const result = res;
-      setScenario(result);
-      console.log(result);
+      setScenario(res);
     } catch (error) {
       console.error(error);
     }
@@ -189,71 +179,55 @@ export default function CreateInvoice() {
     const selectedScenario = scenarioData.find((item) => item.id === id);
 
     if (!selectedScenario) {
-      // Id invalid, clear
       setFormData((prev) => ({
         ...prev,
         scenarioId: id,
-        scenarioDescription: "",
       }));
+      localStorage.removeItem("saleType");
       return;
     }
 
     const localDescription = selectedScenario.saleType;
-    const productDescription = localStorage.setItem(
-      "productDescription",
-      selectedScenario.description
-    );
+    localStorage.setItem("productDescription", selectedScenario.description);
     const matchingApiRecord = scenario.find(
       (item) =>
         item.transactioN_DESC &&
-        item.transactioN_DESC.trim().toLowerCase() ===
-          localDescription.trim().toLowerCase()
+        item.transactioN_DESC.trim().toLowerCase() === localDescription.trim().toLowerCase()
     );
 
     if (matchingApiRecord) {
-      localStorage.setItem(
-        "transactionTypeId",
-        matchingApiRecord.transactioN_TYPE_ID
-      );
-      localStorage.setItem("salesType", matchingApiRecord.transactioN_DESC);
+      localStorage.setItem("transactionTypeId", matchingApiRecord.transactioN_TYPE_ID);
+      localStorage.setItem("saleType", matchingApiRecord.transactioN_DESC);
 
-      console.log(
-        "Transaction type ID saved:",
-        matchingApiRecord.transactioN_TYPE_ID
-      );
-
-      // 4️⃣ Also update your formData with description
       setFormData((prev) => ({
         ...prev,
         scenarioId: id,
-        scenarioDescription: matchingApiRecord?.transactioN_DESC ?? "",
         buyerRegistrationType: id === "SN001" ? "Registered" : "Unregistered",
         items: prev.items.map((item) => ({
           ...item,
+          productDescription: selectedScenario.description,
           sroScheduleNo: "",
           sroItemSerialNo: "",
           rate: "",
-          fixedNotifiedValueOrRetailPrice: "",
-          quantity: "",
-          valueSalesExcludingST: "",
-          salesTaxApplicable: "",
-          totalValues: "",
-          salesTaxWithheldAtSource: "",
+          fixedNotifiedValueOrRetailPrice: 0,
+          quantity: 1,
+          valueSalesExcludingST: 0,
+          salesTaxApplicable: 0,
+          totalValues: 0,
+          salesTaxWithheldAtSource: 0,
           extraTax: "",
-          furtherTax: "",
-          fedPayable: "",
-          discount: "",
+          furtherTax: 0,
+          fedPayable: 0,
+          discount: 0,
+          saleType: matchingApiRecord?.transactioN_DESC ?? selectedScenario.saleType ?? "",
           isSROScheduleEnabled: false,
           isSROItemEnabled: false,
         })),
       }));
     } else {
-      // No match ➜ clear or leave as is
-      console.warn("No matching description found in API");
       setFormData((prev) => ({
         ...prev,
         scenarioId: id,
-        scenarioDescription: "",
       }));
     }
   };
@@ -261,53 +235,31 @@ export default function CreateInvoice() {
   const handleSubmitChange = async () => {
     setLoading(true);
     try {
-      const res = await postData("di_data/v1/di/postinvoicedata_sb", formData);
-      console.log(res);
+      const cleanedItems = formData.items.map(
+        ({ isSROScheduleEnabled, isSROItemEnabled, ...rest }) => ({
+          ...rest,
+          sroScheduleNo: rest.sroScheduleNo?.trim() !== "" ? rest.sroScheduleNo : "",
+          sroItemSerialNo: rest.sroItemSerialNo?.trim() !== "" ? rest.sroItemSerialNo : "",
+          productDescription: rest.productDescription?.trim() !== "" ? rest.productDescription : "N/A",
+          saleType: rest.saleType?.trim() !== "" ? rest.saleType : "Goods at standard rate (default)",
+        })
+      );
+
+      const cleanedData = {
+        ...formData,
+        invoiceDate: dayjs(formData.invoiceDate).format("YYYY-MM-DD"),
+        items: cleanedItems,
+      };
+
+      const res = await postData("di_data/v1/di/validateinvoicedata_sb", cleanedData);
+
       if (res.status === 200) {
         Swal.fire({
           icon: "success",
           title: "Success",
           text: "Invoice submitted successfully.",
         });
-        // Reset form after successful submission
-        setFormData({
-          invoiceType: "Sale Invoice",
-          invoiceDate: dayjs("2025-07-02"),
-          sellerNTNCNIC: "7458525",
-          sellerBusinessName: "IBL",
-          sellerProvince: "Sindh",
-          sellerAddress: "Karachi",
-          buyerNTNCNIC: "",
-          buyerBusinessName: "",
-          buyerProvince: "AZAD JAMMU AND KASHMIR",
-          buyerAddress: "",
-          buyerRegistrationType: "Registered",
-          invoiceRefNo: "",
-          scenarioId: "SN001",
-          items: [
-            {
-              hsCode: "0304.5400",
-              productDescription: "",
-              rate: "18.00%",
-              uoM: "",
-              quantity: "",
-              totalValues: "",
-              valueSalesExcludingST: "",
-              fixedNotifiedValueOrRetailPrice: "",
-              salesTaxApplicable: "",
-              salesTaxWithheldAtSource: "",
-              sroScheduleNo: "",
-              sroItemSerialNo: "",
-              salesType: "",
-              isSROScheduleEnabled: false,
-              isSROItemEnabled: false,
-              extraTax: "",
-              furtherTax: "",
-              fedPayable: "",
-              discount: "",
-            },
-          ],
-        });
+        setIsPrintable(true); // Enable print option after successful submission
       }
     } catch (error) {
       Swal.fire({
@@ -320,6 +272,10 @@ export default function CreateInvoice() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePrintInvoice = () => {
+    printInvoice(formData); // Print the current form data
   };
 
   return (
@@ -642,10 +598,7 @@ export default function CreateInvoice() {
               <TextField
                 fullWidth
                 label="Product Description"
-                value={localStorage.getItem("productDescription") || ""}
-                onChange={(e) =>
-                  handleItemChange(index, "productDescription", e.target.value)
-                }
+                value={item.productDescription}
                 InputProps={{
                   readOnly: true,
                 }}
@@ -828,9 +781,9 @@ export default function CreateInvoice() {
                 fullWidth
                 label="Sales Type"
                 type="text"
-                value={localStorage.getItem("salesType") || ""}
+                value={localStorage.getItem("saleType") || ""}
                 onChange={(e) =>
-                  handleItemChange(index, "salesType", e.target.value)
+                  handleItemChange(index, "saleType", e.target.value)
                 }
                 InputProps={{
                   readOnly: true,
@@ -858,13 +811,24 @@ export default function CreateInvoice() {
         <Button variant="contained" onClick={addNewItem} color="secondary">
           Add New Item
         </Button>
-        <Button
-          onClick={handleSubmitChange}
-          variant="contained"
-          color="primary"
-        >
-          Submit
-        </Button>
+        <Box>
+          <Button
+            onClick={handleSubmitChange}
+            variant="contained"
+            color="primary"
+            sx={{ mr: 2 }}
+          >
+            Submit
+          </Button>
+          <Button
+            variant="contained"
+            color="info"
+            onClick={handlePrintInvoice}
+            disabled={!isPrintable}
+          >
+            Print Invoice
+          </Button>
+        </Box>
       </Box>
     </Box>
   );
