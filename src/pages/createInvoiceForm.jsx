@@ -15,11 +15,12 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import Button from "@mui/material/Button";
 import dayjs from "dayjs";
 import { scenarioData } from "../component/ScnerioData";
-import { fetchData } from "../API/GetApi";
+import { fetchData, postData } from "../API/GetApi";
 import RateSelector from "../component/RateSelector";
 import SROScheduleNumber from "../component/SROScheduleNumber";
 import SROItem from "../component/SROItem";
 import UnitOfMeasurement from "../component/UnitOfMeasurement";
+import Swal from "sweetalert2";
 
 export default function CreateInvoice() {
   const [formData, setFormData] = React.useState({
@@ -34,7 +35,7 @@ export default function CreateInvoice() {
     buyerProvince: "AZAD JAMMU AND KASHMIR",
     buyerAddress: "",
     buyerRegistrationType: "Registered",
-    invoiceRefNo: "INV-1751446315",
+    invoiceRefNo: "",
     scenarioId: "SN001",
     items: [
       {
@@ -53,11 +54,16 @@ export default function CreateInvoice() {
         salesType: "",
         isSROScheduleEnabled: false,
         isSROItemEnabled: false,
+        extraTax: "",
+        furtherTax: "",
+        fedPayable: "",
+        discount: "",
       },
     ],
   });
 
   const [scenario, setScenario] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
 
   const handleChange = (name, value) => {
     setFormData((prev) => ({
@@ -97,9 +103,12 @@ export default function CreateInvoice() {
 
       // CALCULATION only if Unit Cost and Quantity are filled
       if (
-        (field === "fixedNotifiedValueOrRetailPrice" || field === "quantity") &&
-        unitCost > 0 &&
-        quantity > 0
+        (field === "fixedNotifiedValueOrRetailPrice" ||
+          field === "quantity" ||
+          field === "rate") &&
+        unitCost >= 0 &&
+        quantity > 0 &&
+        rateFraction >= 0
       ) {
         const valueSales = unitCost * quantity;
         const salesTax = valueSales * rateFraction;
@@ -110,6 +119,12 @@ export default function CreateInvoice() {
         item.salesTaxApplicable = salesTax.toFixed(2);
         item.totalValues = totalValues.toFixed(2);
         item.salesTaxWithheldAtSource = withheld.toFixed(2);
+
+        // new fields
+        item.extraTax = 0;
+        item.furtherTax = 0;
+        item.fedPayable = 0;
+        item.discount = 0;
       }
 
       updatedItems[index] = item;
@@ -135,6 +150,13 @@ export default function CreateInvoice() {
           salesTaxWithheldAtSource: "",
           sroScheduleNo: "",
           sroItemSerialNo: "",
+          extraTax: "",
+          furtherTax: "",
+          fedPayable: "",
+          discount: "",
+          saleType: "",
+          isSROScheduleEnabled: false,
+          isSROItemEnabled: false,
         },
       ],
     }));
@@ -205,14 +227,25 @@ export default function CreateInvoice() {
         ...prev,
         scenarioId: id,
         scenarioDescription: matchingApiRecord?.transactioN_DESC ?? "",
+        buyerRegistrationType: id === "SN001" ? "Registered" : "Unregistered",
         items: prev.items.map((item) => ({
           ...item,
           sroScheduleNo: "",
           sroItemSerialNo: "",
           rate: "",
+          fixedNotifiedValueOrRetailPrice: "",
+          quantity: "",
+          valueSalesExcludingST: "",
+          salesTaxApplicable: "",
+          totalValues: "",
+          salesTaxWithheldAtSource: "",
+          extraTax: "",
+          furtherTax: "",
+          fedPayable: "",
+          discount: "",
+          isSROScheduleEnabled: false,
+          isSROItemEnabled: false,
         })),
-        isSROScheduleEnabled: false,
-        isSROItemEnabled: false,
       }));
     } else {
       // No match ➜ clear or leave as is
@@ -222,6 +255,70 @@ export default function CreateInvoice() {
         scenarioId: id,
         scenarioDescription: "",
       }));
+    }
+  };
+
+  const handleSubmitChange = async () => {
+    setLoading(true);
+    try {
+      const res = await postData("di_data/v1/di/postinvoicedata_sb", formData);
+      console.log(res);
+      if (res.status === 200) {
+        Swal.fire({
+          icon: "success",
+          title: "Success",
+          text: "Invoice submitted successfully.",
+        });
+        // Reset form after successful submission
+        setFormData({
+          invoiceType: "Sale Invoice",
+          invoiceDate: dayjs("2025-07-02"),
+          sellerNTNCNIC: "7458525",
+          sellerBusinessName: "IBL",
+          sellerProvince: "Sindh",
+          sellerAddress: "Karachi",
+          buyerNTNCNIC: "",
+          buyerBusinessName: "",
+          buyerProvince: "AZAD JAMMU AND KASHMIR",
+          buyerAddress: "",
+          buyerRegistrationType: "Registered",
+          invoiceRefNo: "",
+          scenarioId: "SN001",
+          items: [
+            {
+              hsCode: "0304.5400",
+              productDescription: "",
+              rate: "18.00%",
+              uoM: "",
+              quantity: "",
+              totalValues: "",
+              valueSalesExcludingST: "",
+              fixedNotifiedValueOrRetailPrice: "",
+              salesTaxApplicable: "",
+              salesTaxWithheldAtSource: "",
+              sroScheduleNo: "",
+              sroItemSerialNo: "",
+              salesType: "",
+              isSROScheduleEnabled: false,
+              isSROItemEnabled: false,
+              extraTax: "",
+              furtherTax: "",
+              fedPayable: "",
+              discount: "",
+            },
+          ],
+        });
+      }
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to submit the invoice. Please try again.",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#d33",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -671,6 +768,58 @@ export default function CreateInvoice() {
                 InputProps={{ readOnly: true }}
               />
             </Box>
+            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+              <TextField
+                fullWidth
+                label="Extra Tax"
+                type="number"
+                value={item.extraTax}
+                onChange={(e) =>
+                  handleItemChange(index, "extraTax", e.target.value)
+                }
+                variant="outlined"
+                InputProps={{ readOnly: true }}
+              />
+            </Box>
+            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+              <TextField
+                fullWidth
+                label="Further Tax"
+                type="number"
+                value={item.furtherTax}
+                onChange={(e) =>
+                  handleItemChange(index, "furtherTax", e.target.value)
+                }
+                variant="outlined"
+                InputProps={{ readOnly: true }}
+              />
+            </Box>
+            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+              <TextField
+                fullWidth
+                label="FED Payable"
+                type="number"
+                value={item.fedPayable}
+                onChange={(e) =>
+                  handleItemChange(index, "fedPayable", e.target.value)
+                }
+                variant="outlined"
+                InputProps={{ readOnly: true }}
+              />
+            </Box>
+            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+              <TextField
+                fullWidth
+                label="Discount"
+                type="number"
+                value={item.discount}
+                onChange={(e) =>
+                  handleItemChange(index, "discount", e.target.value)
+                }
+                variant="outlined"
+                InputProps={{ readOnly: true }}
+              />
+            </Box>
           </Box>
 
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mt: 2 }}>
@@ -709,7 +858,11 @@ export default function CreateInvoice() {
         <Button variant="contained" onClick={addNewItem} color="secondary">
           Add New Item
         </Button>
-        <Button variant="contained" color="primary">
+        <Button
+          onClick={handleSubmitChange}
+          variant="contained"
+          color="primary"
+        >
           Submit
         </Button>
       </Box>
