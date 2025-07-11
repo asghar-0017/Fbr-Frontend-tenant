@@ -21,7 +21,6 @@ import SROScheduleNumber from "../component/SROScheduleNumber";
 import SROItem from "../component/SROItem";
 import UnitOfMeasurement from "../component/UnitOfMeasurement";
 import Swal from "sweetalert2";
-import { printInvoice } from "./PrintTable"; // Corrected import path
 import axios from "axios";
 
 export default function CreateInvoice() {
@@ -486,7 +485,7 @@ export default function CreateInvoice() {
             postRes.data.validationResponse.statusCode === "00"
           ) {
             const createInvoiceResponse = await axios.post(
-              "http://localhost:5152/create-invoice",
+              "http://45.55.137.96:5150/create-invoice",
               {
                 ...cleanedData,
                 invoiceNumber: postRes.data.invoiceNumber,
@@ -1097,7 +1096,7 @@ export default function CreateInvoice() {
 
       {/* Add and Submit Buttons */}
       <Box sx={{ display: "flex", justifyContent: "space-between", mt: 4 }}>
-        <Button variant="contained" onClick={addNewItem} color="secondary">
+        <Button variant="contained" onClick={addNewItem} color="success">
           Add New Item
         </Button>
         <Box>
@@ -1108,14 +1107,6 @@ export default function CreateInvoice() {
             sx={{ mr: 2 }}
           >
             Submit
-          </Button>
-          <Button
-            variant="contained"
-            color="info"
-            onClick={handlePrintInvoice}
-            disabled={!isPrintable}
-          >
-            Print Invoice
           </Button>
         </Box>
       </Box>
