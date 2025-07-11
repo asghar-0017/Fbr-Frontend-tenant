@@ -8,6 +8,7 @@ const SROScheduleNumber = ({
   handleItemChange,
   RateId,
   disabled,
+  selectedProvince,
 }) => {
   const [sro, setSro] = useState([]);
 
@@ -15,8 +16,30 @@ const SROScheduleNumber = ({
     try {
       var RateId = localStorage.getItem("selectedRateId");
       console.log("RateIdRateId", RateId);
+
+      if (!RateId) {
+        console.warn("selectedRateId is missing in localStorage");
+        return;
+      }
+
+      const provinceResponse = JSON.parse(
+        localStorage.getItem("provinceResponse") || "[]"
+      );
+      const selectedProvinceObj = provinceResponse.find(
+        (prov) => prov.stateProvinceDesc === selectedProvince
+      );
+
+      if (!selectedProvinceObj) {
+        console.warn(
+          `Province not found in provinceResponse: ${selectedProvince}`
+        );
+        return;
+      }
+
+      const stateProvinceCode = selectedProvinceObj?.stateProvinceCode;
+
       const response = await fetchData(
-        `pdi/v1/SroSchedule?rate_id=${RateId}&date=04-Feb-2024&origination_supplier_csv=8`
+        `pdi/v1/SroSchedule?rate_id=${RateId}&date=04-Feb-2024&origination_supplier_csv=${stateProvinceCode}`
       );
       console.log("SROSROSRO", response);
       setSro(response);
@@ -30,7 +53,7 @@ const SROScheduleNumber = ({
   // Fetch rates on component mount
   useEffect(() => {
     getSRO();
-  }, [RateId]);
+  }, [RateId, selectedProvince]);
 
   const handleSROChange = (event) => {
     const selectedSRO = event.target.value; // e.g., "18%"

@@ -79,6 +79,7 @@ export const postData = async (endpoint, data) => {
 
 export const fetchData = async (endpoint) => {
   const token = localStorage.getItem("token");
+  console.log("Token:", token);
   if (!token) {
     throw new Error("No authentication token found");
   }

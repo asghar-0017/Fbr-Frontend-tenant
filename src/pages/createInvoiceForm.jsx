@@ -22,6 +22,7 @@ import SROItem from "../component/SROItem";
 import UnitOfMeasurement from "../component/UnitOfMeasurement";
 import Swal from "sweetalert2";
 import { printInvoice } from "./PrintTable"; // Corrected import path
+import axios from "axios";
 
 export default function CreateInvoice() {
   const [formData, setFormData] = React.useState({
@@ -37,11 +38,11 @@ export default function CreateInvoice() {
     buyerAddress: "",
     buyerRegistrationType: "",
     invoiceRefNo: "",
-    scenarioId: "SN001",
+    scenarioId: "",
     items: [
       {
         hsCode: "0304.5400",
-        productDescription: "Goods at standard rate to registered buyers",
+        productDescription: "",
         rate: "",
         uoM: "",
         quantity: 1,
@@ -66,6 +67,20 @@ export default function CreateInvoice() {
   const [scenario, setScenario] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [isPrintable, setIsPrintable] = React.useState(false);
+  const [province, setProvince] = React.useState([]);
+
+  React.useEffect(() => {
+    const handleBeforeUnload = () => {
+      localStorage.clear(); // Clear all local storage
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    // Cleanup the event listener when the component unmounts
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
 
   const handleChange = (name, value) => {
     setFormData((prev) => ({
@@ -73,6 +88,20 @@ export default function CreateInvoice() {
       [name]: value,
     }));
   };
+
+  const getProvince = async () => {
+    try {
+      const response = await fetchData("pdi/v1/provinces");
+      console.log("Province Response:", response);
+      setProvince(response);
+      localStorage.setItem("provinceResponse", JSON.stringify(response));
+    } catch (error) {
+      console.error("Error fetching provinces:", error);
+    }
+  };
+  React.useEffect(() => {
+    getProvince();
+  }, []);
 
   const handleItemChange = (index, field, value) => {
     setFormData((prev) => {
@@ -132,7 +161,7 @@ export default function CreateInvoice() {
         {
           hsCode: "",
           productDescription: "",
-          rate: "18.00%",
+          rate: "18%",
           uoM: "",
           quantity: 1,
           totalValues: 0,
@@ -212,7 +241,7 @@ export default function CreateInvoice() {
           productDescription: selectedScenario.description,
           sroScheduleNo: "",
           sroItemSerialNo: "",
-          rate: "",
+          rate: "18%",
           fixedNotifiedValueOrRetailPrice: 0,
           quantity: 1,
           valueSalesExcludingST: 0,
@@ -311,63 +340,34 @@ export default function CreateInvoice() {
   //   }
   // };
 
-const handleSubmitChange = async () => {
-  setLoading(true);
-  try {
-    // Validate required fields (unchanged from previous response)
-    const requiredFields = [
-      { field: "invoiceType", message: "Invoice Type is required" },
-      { field: "invoiceDate", message: "Invoice Date is required" },
-      { field: "sellerNTNCNIC", message: "Seller NTN/CNIC is required" },
-      { field: "sellerBusinessName", message: "Seller Business Name is required" },
-      { field: "sellerProvince", message: "Seller Province is required" },
-      { field: "sellerAddress", message: "Seller Address is required" },
-      { field: "buyerBusinessName", message: "Buyer Business Name is required" },
-      { field: "buyerProvince", message: "Buyer Province is required" },
-      { field: "buyerAddress", message: "Buyer Address is required" },
-      { field: "buyerRegistrationType", message: "Buyer Registration Type is required" },
-    ];
-
-    for (const { field, message } of requiredFields) {
-      if (!formData[field]) {
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: message,
-          confirmButtonColor: "#d33",
-        });
-        setLoading(false);
-        return;
-      }
-    }
-
-    // Validate buyerNTNCNIC for registered buyers
-    if (formData.buyerRegistrationType === "Registered" && !formData.buyerNTNCNIC) {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "Buyer NTN/CNIC is required for registered buyers",
-        confirmButtonColor: "#d33",
-      });
-      setLoading(false);
-      return;
-    }
-
-    // Validate items
-    for (const [index, item] of formData.items.entries()) {
-      const itemRequiredFields = [
-        { field: "hsCode", message: `HS Code is required for item ${index + 1}` },
-        { field: "productDescription", message: `Product Description is required for item ${index + 1}` },
-        { field: "rate", message: `Rate is required for item ${index + 1}` },
-        { field: "uoM", message: `Unit of Measurement is required for item ${index + 1}` },
-        { field: "quantity", message: `Quantity is required for item ${index + 1}` },
-        { field: "valueSalesExcludingST", message: `Value Sales Excluding ST is required for item ${index + 1}` },
-        { field: "salesTaxApplicable", message: `Sales Tax Applicable is required for item ${index + 1}` },
-        { field: "saleType", message: `Sale Type is required for item ${index + 1}` },
+  const handleSubmitChange = async () => {
+    setLoading(true);
+    try {
+      // Validate required fields (unchanged from previous response)
+      const requiredFields = [
+        { field: "invoiceType", message: "Invoice Type is required" },
+        { field: "invoiceDate", message: "Invoice Date is required" },
+        { field: "sellerNTNCNIC", message: "Seller NTN/CNIC is required" },
+        {
+          field: "sellerBusinessName",
+          message: "Seller Business Name is required",
+        },
+        { field: "sellerProvince", message: "Seller Province is required" },
+        { field: "sellerAddress", message: "Seller Address is required" },
+        {
+          field: "buyerBusinessName",
+          message: "Buyer Business Name is required",
+        },
+        { field: "buyerProvince", message: "Buyer Province is required" },
+        { field: "buyerAddress", message: "Buyer Address is required" },
+        {
+          field: "buyerRegistrationType",
+          message: "Buyer Registration Type is required",
+        },
       ];
 
-      for (const { field, message } of itemRequiredFields) {
-        if (!item[field]) {
+      for (const { field, message } of requiredFields) {
+        if (!formData[field]) {
           Swal.fire({
             icon: "error",
             title: "Error",
@@ -378,91 +378,180 @@ const handleSubmitChange = async () => {
           return;
         }
       }
-    }
 
-    const cleanedItems = formData.items.map(
-      ({ isSROScheduleEnabled, isSROItemEnabled, ...rest }) => ({
-        ...rest,
-        sroScheduleNo: rest.sroScheduleNo?.trim() || "",
-        sroItemSerialNo: rest.sroItemSerialNo?.trim() || "",
-        productDescription: rest.productDescription?.trim() || "N/A",
-        saleType: rest.saleType?.trim() || "Goods at standard rate (default)",
-      })
-    );
-
-    const cleanedData = {
-      ...formData,
-      invoiceDate: dayjs(formData.invoiceDate).format("YYYY-MM-DD"),
-      items: cleanedItems,
-    };
-
-    // Log token for debugging
-    const token = localStorage.getItem("token");
-    console.log("Token used:", token);
-
-    // Step 1: Validate invoice data
-    const validateRes = await postData("di_data/v1/di/validateinvoicedata_sb", cleanedData);
-
-    if (validateRes.status === 200 && validateRes.data.validationResponse.statusCode === "00") {
-      // Step 2: Post invoice data
-      try {
-        const postRes = await postData("di_data/v1/di/postinvoicedata_sb", cleanedData);
-        console.log("Post Invoice Response:", postRes);
-        if (postRes.status === 200 && postRes.data.validationResponse.statusCode === "00") {
-          Swal.fire({
-            icon: "success",
-            title: "Success",
-            text: `Invoice submitted successfully! Invoice Number: ${postRes.data.invoiceNumber}`,
-            confirmButtonColor: "#28a745",
-          });
-          setIsPrintable(true);
-        } else {
-          Swal.fire({
-            icon: "error",
-            title: "Error",
-            text:
-              postRes.data.validationResponse.error ||
-              "Invoice submission failed.",
-            confirmButtonColor: "#d33",
-          });
-        }
-      } catch (postError) {
-        console.error("Post Invoice Error:", {
-          message: postError.message,
-          status: postError.response?.status,
-          data: postError.response?.data,
-        });
+      // Validate buyerNTNCNIC for registered buyers
+      if (
+        formData.buyerRegistrationType === "Registered" &&
+        !formData.buyerNTNCNIC
+      ) {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: `Failed to submit invoice: ${postError.response?.data?.validationResponse?.error || postError.message}`,
+          text: "Buyer NTN/CNIC is required for registered buyers",
+          confirmButtonColor: "#d33",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Validate items
+      for (const [index, item] of formData.items.entries()) {
+        const itemRequiredFields = [
+          {
+            field: "hsCode",
+            message: `HS Code is required for item ${index + 1}`,
+          },
+          {
+            field: "productDescription",
+            message: `Product Description is required for item ${index + 1}`,
+          },
+          { field: "rate", message: `Rate is required for item ${index + 1}` },
+          {
+            field: "uoM",
+            message: `Unit of Measurement is required for item ${index + 1}`,
+          },
+          {
+            field: "quantity",
+            message: `Quantity is required for item ${index + 1}`,
+          },
+          {
+            field: "valueSalesExcludingST",
+            message: `Value Sales Excluding ST is required for item ${
+              index + 1
+            }`,
+          },
+          {
+            field: "salesTaxApplicable",
+            message: `Sales Tax Applicable is required for item ${index + 1}`,
+          },
+          {
+            field: "saleType",
+            message: `Sale Type is required for item ${index + 1}`,
+          },
+        ];
+
+        for (const { field, message } of itemRequiredFields) {
+          if (!item[field]) {
+            Swal.fire({
+              icon: "error",
+              title: "Error",
+              text: message,
+              confirmButtonColor: "#d33",
+            });
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
+      const cleanedItems = formData.items.map(
+        ({ isSROScheduleEnabled, isSROItemEnabled, ...rest }) => ({
+          ...rest,
+          sroScheduleNo: rest.sroScheduleNo?.trim() || "",
+          sroItemSerialNo: rest.sroItemSerialNo?.trim() || "",
+          productDescription: rest.productDescription?.trim() || "N/A",
+          saleType: rest.saleType?.trim() || "Goods at standard rate (default)",
+        })
+      );
+
+      const cleanedData = {
+        ...formData,
+        invoiceDate: dayjs(formData.invoiceDate).format("YYYY-MM-DD"),
+        items: cleanedItems,
+      };
+
+      // Log token for debugging
+      const token = localStorage.getItem("token");
+      console.log("Token used:", token);
+
+      // Step 1: Validate invoice data
+      const validateRes = await postData(
+        "di_data/v1/di/validateinvoicedata_sb",
+        cleanedData
+      );
+
+      if (
+        validateRes.status === 200 &&
+        validateRes.data.validationResponse.statusCode === "00"
+      ) {
+        // Step 2: Post invoice data
+        try {
+          const postRes = await postData(
+            "di_data/v1/di/postinvoicedata_sb",
+            cleanedData
+          );
+          console.log("Post Invoice Response:", postRes);
+          if (
+            postRes.status === 200 &&
+            postRes.data.validationResponse.statusCode === "00"
+          ) {
+            const createInvoiceResponse = await axios.post(
+              "http://localhost:5152/create-invoice",
+              {
+                ...cleanedData,
+                invoiceNumber: postRes.data.invoiceNumber,
+                dated: postRes.data.dated,
+              }
+            );
+            console.log("Create Invoice Response:", createInvoiceResponse);
+            if (createInvoiceResponse.status === 201) {
+              Swal.fire({
+                icon: "success",
+                title: "Success",
+                text: `Invoice submitted successfully! Invoice Number: ${postRes.data.invoiceNumber}`,
+                confirmButtonColor: "#28a745",
+              });
+              setIsPrintable(true);
+            }
+          } else {
+            Swal.fire({
+              icon: "error",
+              title: "Error",
+              text:
+                postRes.data.validationResponse.error ||
+                "Invoice submission failed.",
+              confirmButtonColor: "#d33",
+            });
+          }
+        } catch (postError) {
+          console.error("Post Invoice Error:", {
+            message: postError.message,
+            status: postError.response?.status,
+            data: postError.response?.data,
+          });
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: `Failed to submit invoice: ${
+              postError.response?.data?.validationResponse?.error ||
+              postError.message
+            }`,
+            confirmButtonColor: "#d33",
+          });
+        }
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text:
+            validateRes.data.validationResponse.error ||
+            "Invoice validation failed.",
           confirmButtonColor: "#d33",
         });
       }
-    } else {
+    } catch (error) {
+      console.error("General Error:", error);
       Swal.fire({
         icon: "error",
         title: "Error",
-        text:
-          validateRes.data.validationResponse.error ||
-          "Invoice validation failed.",
+        text: `Failed to process the invoice: ${error.message}`,
         confirmButtonColor: "#d33",
       });
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error("General Error:", error);
-    Swal.fire({
-      icon: "error",
-      title: "Error",
-      text: `Failed to process the invoice: ${error.message}`,
-      confirmButtonColor: "#d33",
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
-  
   const handlePrintInvoice = () => {
     printInvoice(formData); // Print the current form data
   };
@@ -583,10 +672,17 @@ const handleSubmitChange = async () => {
                 label="Seller Province"
                 onChange={(e) => handleChange("sellerProvince", e.target.value)}
               >
-                <MenuItem value="Sindh">Sindh</MenuItem>
-                <MenuItem value="Punjab">Punjab</MenuItem>
-                <MenuItem value="KPK">KPK</MenuItem>
-                <MenuItem value="Balochistan">Balochistan</MenuItem>
+                <MenuItem value="BALOCHISTAN">BALOCHISTAN</MenuItem>
+                <MenuItem value="AZAD JAMMU AND KASHMIR">
+                  AZAD JAMMU AND KASHMIR
+                </MenuItem>
+                <MenuItem value="CAPITAL TERRITORY">CAPITAL TERRITORY</MenuItem>
+                <MenuItem value="KHYBER PAKHTUNKHWA">
+                  KHYBER PAKHTUNKHWA
+                </MenuItem>
+                <MenuItem value="PUNJAB">PUNJAB</MenuItem>
+                <MenuItem value="SINDH">SINDH</MenuItem>
+                <MenuItem value="GILGIT BALTISTAN">GILGIT BALTISTAN</MenuItem>
               </Select>
             </FormControl>
           </Box>
@@ -641,13 +737,14 @@ const handleSubmitChange = async () => {
                 label="Buyer Province"
                 onChange={(e) => handleChange("buyerProvince", e.target.value)}
               >
-                <MenuItem value="AZAD JAMMU AND KASHMIR">
-                  AZAD JAMMU AND KASHMIR
-                </MenuItem>
-                <MenuItem value="Sindh">Sindh</MenuItem>
-                <MenuItem value="Punjab">Punjab</MenuItem>
-                <MenuItem value="KPK">KPK</MenuItem>
-                <MenuItem value="Balochistan">Balochistan</MenuItem>
+                {province.map((prov) => (
+                  <MenuItem
+                    key={prov.stateProvinceCode}
+                    value={prov.stateProvinceDesc}
+                  >
+                    {prov.stateProvinceDesc}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Box>
@@ -764,6 +861,7 @@ const handleSubmitChange = async () => {
               disabled={!item.isSROScheduleEnabled}
               handleItemChange={handleItemChange}
               RateId={localStorage.getItem("selectedRateId")}
+              selectedProvince={formData.buyerProvince}
             />
 
             <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
@@ -812,6 +910,7 @@ const handleSubmitChange = async () => {
               item={item}
               handleItemChange={handleItemChange}
               transactionTypeId={localStorage.getItem("transactionTypeId")}
+              selectedProvince={formData.buyerProvince}
             />
           </Box>
 

@@ -2,7 +2,13 @@ import React, { useState, useEffect } from "react";
 import { Box, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
 import { fetchData } from "../API/GetApi";
 
-const RateSelector = ({ index, item, handleItemChange, transactionTypeId }) => {
+const RateSelector = ({
+  index,
+  item,
+  handleItemChange,
+  transactionTypeId,
+  selectedProvince,
+}) => {
   const [rates, setRates] = useState([]);
 
   // Function to fetch rate data
@@ -12,8 +18,23 @@ const RateSelector = ({ index, item, handleItemChange, transactionTypeId }) => {
     }
     try {
       var transctionId = localStorage.getItem("transactionTypeId");
+      const provinceResponse = JSON.parse(
+        localStorage.getItem("provinceResponse")
+      );
+      const selectedProvinceObj = provinceResponse.find(
+        (prov) => prov.stateProvinceDesc === selectedProvince
+      );
+
+      if (!selectedProvinceObj) {
+        console.warn(
+          `Province not found in provinceResponse: ${selectedProvince}`
+        );
+        return;
+      }
+      const stateProvinceCode = selectedProvinceObj?.stateProvinceCode;
+
       const response = await fetchData(
-        `pdi/v2/SaleTypeToRate?date=24-Feb-2024&transTypeId=${transctionId}&originationSupplier=8`
+        `pdi/v2/SaleTypeToRate?date=24-Feb-2024&transTypeId=${transctionId}&originationSupplier=${stateProvinceCode}`
       );
       console.log(
         "responseresponseresponseresponseresponseresponseresponseresponseresponseresponse",
@@ -30,7 +51,7 @@ const RateSelector = ({ index, item, handleItemChange, transactionTypeId }) => {
   // Fetch rates on component mount
   useEffect(() => {
     getRateData();
-  }, [transactionTypeId]);
+  }, [transactionTypeId, selectedProvince]);
 
   // Handle rate selection and save ratE_ID to localStorage
   const handleRateChange = (event) => {
