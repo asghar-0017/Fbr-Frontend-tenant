@@ -7,6 +7,7 @@ import {
   MenuItem,
   FormControl,
   Typography,
+  Autocomplete,
 } from "@mui/material";
 import { DemoContainer } from "@mui/x-date-pickers/internals/demo";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -67,6 +68,8 @@ export default function CreateInvoice() {
   const [loading, setLoading] = React.useState(false);
   const [isPrintable, setIsPrintable] = React.useState(false);
   const [province, setProvince] = React.useState([]);
+  const [hsCodeList, setHsCodeList] = React.useState([]);
+  const [invoiceTypes, setInvoiceTypes] = React.useState([]);
 
   React.useEffect(() => {
     const handleBeforeUnload = () => {
@@ -102,10 +105,60 @@ export default function CreateInvoice() {
     getProvince();
   }, []);
 
+  React.useEffect(() => {
+    const fetchHsCodes = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch("https://gw.fbr.gov.pk/pdi/v1/itemdesccode", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error("Failed to fetch HS Codes");
+        const data = await response.json();
+        setHsCodeList(data);
+      } catch (error) {
+        // fallback to static list if API fails
+        setHsCodeList([
+          { hS_CODE: "0304.5400", description: "Sample Fish" },
+          { hS_CODE: "0101.2100", description: "Sample Animal" },
+          { hS_CODE: "0207.1400", description: "Sample Poultry" },
+          { hS_CODE: "0402.2100", description: "Sample Dairy" },
+          { hS_CODE: "0703.1000", description: "Sample Veg" }
+        ]);
+      }
+    };
+    fetchHsCodes();
+  }, []);
+
+  React.useEffect(() => {
+    const fetchInvoiceTypes = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch("https://gw.fbr.gov.pk/pdi/v1/doctypecode", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error("Failed to fetch invoice types");
+        const data = await response.json();
+        setInvoiceTypes(data);
+      } catch (error) {
+        setInvoiceTypes([
+          { docTypeId: 4, docDescription: "Sale Invoice" },
+          { docTypeId: 9, docDescription: "Debit Note" }
+        ]);
+      }
+    };
+    fetchInvoiceTypes();
+  }, []);
+
   const handleItemChange = (index, field, value) => {
     setFormData((prev) => {
       const updatedItems = [...prev.items];
-      const item = { ...updatedItems[index], [field]: value };
+      const item = { ...updatedItems[index] };
+
+      if (field === "quantity") {
+        item.quantity = value === "" ? "" : parseInt(value, 10) || 0;
+      } else {
+        item[field] = value;
+      }
 
       if (field === "rate" && value) {
         item.isSROScheduleEnabled = true;
@@ -132,9 +185,19 @@ export default function CreateInvoice() {
         rateFraction >= 0
       ) {
         const valueSales = unitCost * quantity;
-        const salesTax = valueSales * rateFraction;
+        // Use integer sales tax for FBR
+        const salesTax = Math.round(valueSales * rateFraction);
         const totalValues = valueSales + salesTax;
         const withheld = salesTax;
+
+        // Debug log
+        console.log({
+          valueSalesExcludingST: unitCost,
+          rate: item.rate,
+          rateFraction,
+          salesTaxApplicable: salesTax,
+          calculated: Math.round(unitCost * rateFraction * 100) / 100
+        });
 
         item.valueSalesExcludingST = unitCost;
         item.salesTaxApplicable = salesTax;
@@ -153,6 +216,10 @@ export default function CreateInvoice() {
   };
 
   const addNewItem = () => {
+    // Find the selected scenario's saleType
+    const selectedScenario = scenarioData.find((item) => item.id === formData.scenarioId);
+    const saleType = selectedScenario ? selectedScenario.saleType : "Goods at Standard Rate (default)";
+
     setFormData((prev) => ({
       ...prev,
       items: [
@@ -174,7 +241,7 @@ export default function CreateInvoice() {
           furtherTax: 0,
           fedPayable: 0,
           discount: 0,
-          saleType: "",
+          saleType, // <-- set saleType here
           isSROScheduleEnabled: false,
           isSROItemEnabled: false,
         },
@@ -446,6 +513,7 @@ export default function CreateInvoice() {
       const cleanedItems = formData.items.map(
         ({ isSROScheduleEnabled, isSROItemEnabled, ...rest }) => ({
           ...rest,
+          quantity: rest.quantity === "" ? 0 : parseInt(rest.quantity, 10),
           sroScheduleNo: rest.sroScheduleNo?.trim() || "",
           sroItemSerialNo: rest.sroItemSerialNo?.trim() || "",
           productDescription: rest.productDescription?.trim() || "N/A",
@@ -589,9 +657,11 @@ export default function CreateInvoice() {
                 label="Invoice Type"
                 onChange={(e) => handleChange("invoiceType", e.target.value)}
               >
-                <MenuItem value="Sale Invoice">Sale Invoice</MenuItem>
-                <MenuItem value="Service Invoice">Service Invoice</MenuItem>
-                <MenuItem value="Export Invoice">Export Invoice</MenuItem>
+                {invoiceTypes.map((type) => (
+                  <MenuItem key={type.docTypeId} value={type.docDescription}>
+                    {type.docDescription}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Box>
@@ -671,17 +741,11 @@ export default function CreateInvoice() {
                 label="Seller Province"
                 onChange={(e) => handleChange("sellerProvince", e.target.value)}
               >
-                <MenuItem value="BALOCHISTAN">BALOCHISTAN</MenuItem>
-                <MenuItem value="AZAD JAMMU AND KASHMIR">
-                  AZAD JAMMU AND KASHMIR
-                </MenuItem>
-                <MenuItem value="CAPITAL TERRITORY">CAPITAL TERRITORY</MenuItem>
-                <MenuItem value="KHYBER PAKHTUNKHWA">
-                  KHYBER PAKHTUNKHWA
-                </MenuItem>
-                <MenuItem value="PUNJAB">PUNJAB</MenuItem>
-                <MenuItem value="SINDH">SINDH</MenuItem>
-                <MenuItem value="GILGIT BALTISTAN">GILGIT BALTISTAN</MenuItem>
+                {province.map((prov) => (
+                  <MenuItem key={prov.stateProvinceCode} value={prov.stateProvinceDesc}>
+                    {prov.stateProvinceDesc}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Box>
@@ -737,10 +801,7 @@ export default function CreateInvoice() {
                 onChange={(e) => handleChange("buyerProvince", e.target.value)}
               >
                 {province.map((prov) => (
-                  <MenuItem
-                    key={prov.stateProvinceCode}
-                    value={prov.stateProvinceDesc}
-                  >
+                  <MenuItem key={prov.stateProvinceCode} value={prov.stateProvinceDesc}>
                     {prov.stateProvinceDesc}
                   </MenuItem>
                 ))}
@@ -757,10 +818,9 @@ export default function CreateInvoice() {
                 labelId="buyer-registration-type-label"
                 value={formData.buyerRegistrationType}
                 label="Buyer Registration Type"
-                inputProps={{ readOnly: true }}
-                onChange={(e) =>
-                  handleChange("buyerRegistrationType", e.target.value)
-                }
+                onChange={(e) => handleChange("buyerRegistrationType", e.target.value)}
+                inputProps={{ readOnly: formData.scenarioId === "SN001" }}
+                disabled={formData.scenarioId === "SN001"}
               >
                 <MenuItem value="Registered">Registered</MenuItem>
                 <MenuItem value="Unregistered">Unregistered</MenuItem>
@@ -808,13 +868,19 @@ export default function CreateInvoice() {
                 </MenuItem>
                 {scenarioData.map((curElem) => (
                   <MenuItem key={curElem.id} value={curElem.id}>
-                    {curElem.id}
+                    {curElem.id} - {curElem.description}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
           </Box>
         </Box>
+        {/* Show selected scenario description */}
+        {formData.scenarioId && (
+          <Typography variant="body2" sx={{ mt: 1, ml: 2, color: 'text.secondary' }}>
+            {scenarioData.find((s) => s.id === formData.scenarioId)?.description || ''}
+          </Typography>
+        )}
       </Box>
 
       {/* Items Section */}
@@ -864,21 +930,27 @@ export default function CreateInvoice() {
             />
 
             <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
-              <FormControl fullWidth>
-                <InputLabel id={`hs-code-${index}`}>HS Code</InputLabel>
-                <Select
-                  labelId={`hs-code-${index}`}
-                  value={item.hsCode}
-                  label="HS Code"
-                  onChange={(e) =>
-                    handleItemChange(index, "hsCode", e.target.value)
-                  }
-                >
-                  <MenuItem value={item.hsCode}>
-                    <em>0304.5400</em>
-                  </MenuItem>
-                </Select>
-              </FormControl>
+              <Autocomplete
+                fullWidth
+                options={hsCodeList}
+                getOptionLabel={(option) => option.hS_CODE}
+                value={hsCodeList.find((code) => code.hS_CODE === item.hsCode) || null}
+                onChange={(_, newValue) => {
+                  handleItemChange(index, "hsCode", newValue ? newValue.hS_CODE : "");
+                  handleItemChange(index, "productDescription", newValue ? newValue.description : "");
+                }}
+                renderInput={(params) => (
+                  <TextField {...params} label="HS Code" variant="outlined" />
+                )}
+                isOptionEqualToValue={(option, value) => option.hS_CODE === value.hS_CODE}
+                filterOptions={(options, { inputValue }) =>
+                  options.filter(
+                    (option) =>
+                      option.hS_CODE.toLowerCase().includes(inputValue.toLowerCase()) ||
+                      option.description.toLowerCase().includes(inputValue.toLowerCase())
+                  )
+                }
+              />
             </Box>
 
             <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
@@ -1015,11 +1087,8 @@ export default function CreateInvoice() {
                 label="Extra Tax"
                 type="number"
                 value={item.extraTax}
-                onChange={(e) =>
-                  handleItemChange(index, "extraTax", e.target.value)
-                }
+                onChange={(e) => handleItemChange(index, "extraTax", e.target.value)}
                 variant="outlined"
-                InputProps={{ readOnly: true }}
               />
             </Box>
             <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
@@ -1028,11 +1097,8 @@ export default function CreateInvoice() {
                 label="Further Tax"
                 type="number"
                 value={item.furtherTax}
-                onChange={(e) =>
-                  handleItemChange(index, "furtherTax", e.target.value)
-                }
+                onChange={(e) => handleItemChange(index, "furtherTax", e.target.value)}
                 variant="outlined"
-                InputProps={{ readOnly: true }}
               />
             </Box>
             <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
@@ -1041,11 +1107,8 @@ export default function CreateInvoice() {
                 label="FED Payable"
                 type="number"
                 value={item.fedPayable}
-                onChange={(e) =>
-                  handleItemChange(index, "fedPayable", e.target.value)
-                }
+                onChange={(e) => handleItemChange(index, "fedPayable", e.target.value)}
                 variant="outlined"
-                InputProps={{ readOnly: true }}
               />
             </Box>
             <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
@@ -1054,11 +1117,8 @@ export default function CreateInvoice() {
                 label="Discount"
                 type="number"
                 value={item.discount}
-                onChange={(e) =>
-                  handleItemChange(index, "discount", e.target.value)
-                }
+                onChange={(e) => handleItemChange(index, "discount", e.target.value)}
                 variant="outlined"
-                InputProps={{ readOnly: true }}
               />
             </Box>
           </Box>

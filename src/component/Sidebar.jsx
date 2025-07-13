@@ -21,11 +21,14 @@ import MailIcon from "@mui/icons-material/Mail";
 import CreateInvoice from "../pages/createInvoiceForm";
 import { href, NavLink, Route, Routes } from "react-router-dom";
 import YourInvoices from "../pages/YourInvoices";
+import LogoutIcon from "@mui/icons-material/Logout";
+import { Button } from "@mui/material";
 
 const navItems = [
   { name: "Invoice form", href: "/" },
   { name: "Your Invoices", href: "/your-invoices" },
   { name: "Create invoices", href: "#" },
+  {name: "logout"}
 ];
 
 const drawerWidth = 240;
@@ -85,7 +88,7 @@ const DrawerHeader = styled("div")(({ theme }) => ({
   justifyContent: "flex-end",
 }));
 
-export default function Sidebar() {
+export default function Sidebar({ onLogout }) {
   const theme = useTheme();
   const [open, setOpen] = React.useState(false);
 
@@ -95,6 +98,10 @@ export default function Sidebar() {
 
   const handleDrawerClose = () => {
     setOpen(false);
+  };
+  const handleLogoutClick = () => {
+    onLogout();
+    navigate("/"); // return to login screen
   };
 
   return (
@@ -119,6 +126,7 @@ export default function Sidebar() {
           <Typography variant="h6" noWrap component="div">
             FBR Invoices
           </Typography>
+      
         </Toolbar>
       </AppBar>
       <Drawer
@@ -144,26 +152,41 @@ export default function Sidebar() {
           </IconButton>
         </DrawerHeader>
         <Divider />
-        <List>
-          {navItems.map((text, index) => (
-            <NavLink
-              key={text.name}
-              to={text.href}
-              style={{ textDecoration: "none", color: "inherit" }}
-            >
-              <ListItem disablePadding>
-                <ListItemButton>
-                  <ListItemIcon>
-                    {index % 2 === 0 ? <InboxIcon /> : <MailIcon />}
-                  </ListItemIcon>
-                  <ListItemText primary={text.name} />
-                </ListItemButton>
-              </ListItem>
-            </NavLink>
-          ))}
-        </List>
+       <List>
+  {navItems.map((item, index) => {
+    const isLogout = item.name.toLowerCase() === "logout";
+
+    return isLogout ? (
+      <ListItem key={item.name} disablePadding onClick={onLogout}>
+        <ListItemButton>
+          <ListItemIcon>
+            <LogoutIcon />
+          </ListItemIcon>
+          <ListItemText primary="Logout" />
+        </ListItemButton>
+      </ListItem>
+    ) : (
+      <NavLink
+        key={item.name}
+        to={item.href}
+        style={{ textDecoration: "none", color: "inherit" }}
+      >
+        <ListItem disablePadding>
+          <ListItemButton>
+            <ListItemIcon>
+              {index % 2 === 0 ? <InboxIcon /> : <MailIcon />}
+            </ListItemIcon>
+            <ListItemText primary={item.name} />
+          </ListItemButton>
+        </ListItem>
+      </NavLink>
+    );
+  })}
+</List>
+
         <Divider />
       </Drawer>
+      
       <Main open={open}>
         <DrawerHeader />
         <Routes>
