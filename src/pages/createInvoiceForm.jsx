@@ -115,7 +115,7 @@ export default function CreateInvoice() {
         const response = await fetch(
           "https://gw.fbr.gov.pk/pdi/v1/itemdesccode",
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer 63f756ee-69e4-3b5b-a3b7-0b8656624912` },
           }
         );
         if (!response.ok) throw new Error("Failed to fetch HS Codes");
@@ -141,7 +141,7 @@ export default function CreateInvoice() {
         const response = await fetch(
           "https://gw.fbr.gov.pk/pdi/v1/doctypecode",
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer 63f756ee-69e4-3b5b-a3b7-0b8656624912` },
           }
         );
         if (!response.ok) throw new Error("Failed to fetch invoice types");

@@ -35,7 +35,7 @@ export default function BasicTable() {
       const token = localStorage.getItem("token");
       const res = await axios.get("http://45.55.137.96:5150/get-invoice-data", {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer 63f756ee-69e4-3b5b-a3b7-0b8656624912`,
         },
       });
       setInvoices(res.data.data);

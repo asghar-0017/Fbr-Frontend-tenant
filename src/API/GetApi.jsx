@@ -38,13 +38,11 @@ const { apiKey } = API_CONFIG;
 // };
 export const postData = async (endpoint, data) => {
   const token = localStorage.getItem("token");
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
+ 
 
   const config = {
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer 63f756ee-69e4-3b5b-a3b7-0b8656624912`,
     },
   };
 
@@ -80,13 +78,13 @@ export const postData = async (endpoint, data) => {
 export const fetchData = async (endpoint) => {
   const token = localStorage.getItem("token");
   console.log("Token:", token);
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
+  // if (!token) {
+  //   throw new Error("No authentication token found");
+  // }
 
   const config = {
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer 63f756ee-69e4-3b5b-a3b7-0b8656624912`,
     },
   };
 
