@@ -67,6 +67,9 @@ export default function BasicTable() {
     }
   };
 
+  // Sort invoices so the last one (newest) appears first
+  const sortedInvoices = [...invoices].reverse();
+
   return (
     <Box sx={{ p: 2 }}>
       <Typography
@@ -117,7 +120,7 @@ export default function BasicTable() {
           </TableHead>
 
           <TableBody>
-            {invoices.map((row, index) => (
+            {sortedInvoices.map((row, index) => (
               <TableRow
                 key={row._id || index}
                 sx={{

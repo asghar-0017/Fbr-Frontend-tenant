@@ -23,6 +23,7 @@ import SROItem from "../component/SROItem";
 import UnitOfMeasurement from "../component/UnitOfMeasurement";
 import Swal from "sweetalert2";
 import axios from "axios";
+import { useNavigate } from 'react-router-dom';
 
 export default function CreateInvoice() {
   const [formData, setFormData] = React.useState({
@@ -60,6 +61,7 @@ export default function CreateInvoice() {
         furtherTax: 0,
         fedPayable: 0,
         discount: 0,
+        isValueSalesManual: false,
       },
     ],
   });
@@ -70,6 +72,7 @@ export default function CreateInvoice() {
   const [province, setProvince] = React.useState([]);
   const [hsCodeList, setHsCodeList] = React.useState([]);
   const [invoiceTypes, setInvoiceTypes] = React.useState([]);
+  const navigate = useNavigate();
 
   React.useEffect(() => {
     const handleBeforeUnload = () => {
@@ -156,6 +159,37 @@ export default function CreateInvoice() {
 
       if (field === "quantity") {
         item.quantity = value === "" ? "" : parseInt(value, 10) || 0;
+        // Only auto-calculate if not manually overridden
+        if (!item.isValueSalesManual) {
+          const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
+          const quantity = parseFloat(item.quantity || 0);
+          item.valueSalesExcludingST = unitCost * quantity;
+        }
+      } else if (field === "fixedNotifiedValueOrRetailPrice") {
+        item.fixedNotifiedValueOrRetailPrice = value === "" ? 0 : parseFloat(value);
+        if (!item.isValueSalesManual) {
+          const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
+          const quantity = parseFloat(item.quantity || 0);
+          item.valueSalesExcludingST = unitCost * quantity;
+        }
+      } else if (field === "valueSalesExcludingST") {
+        // Allow direct editing and recalculate dependent fields
+        item.valueSalesExcludingST = value === "" ? 0 : parseFloat(value);
+        item.isValueSalesManual = true;
+        if (item.rate && item.rate.toLowerCase() !== 'exempt') {
+          let rateFraction = parseFloat((item.rate || "0").replace("%", "")) / 100;
+          const valueSales = item.valueSalesExcludingST;
+          const salesTax = Math.round(valueSales * rateFraction);
+          const totalValues = valueSales + salesTax;
+          const withheld = salesTax;
+          item.salesTaxApplicable = salesTax;
+          item.totalValues = totalValues;
+          item.salesTaxWithheldAtSource = withheld;
+        } else {
+          item.salesTaxApplicable = 0;
+          item.totalValues = 0;
+          item.salesTaxWithheldAtSource = 0;
+        }
       } else {
         item[field] = value;
       }
@@ -165,6 +199,7 @@ export default function CreateInvoice() {
         item.sroScheduleNo = "";
         item.sroItemSerialNo = "";
         item.isSROItemEnabled = false;
+        item.isValueSalesManual = false; // Reset manual override on rate change
       }
 
       if (field === "sroScheduleNo" && value) {
@@ -172,42 +207,57 @@ export default function CreateInvoice() {
         item.sroItemSerialNo = "";
       }
 
-      let rateFraction = parseFloat((item.rate || "0").replace("%", "")) / 100;
-      const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
-      const quantity = parseFloat(item.quantity || 0);
-
-      if (
-        (field === "fixedNotifiedValueOrRetailPrice" ||
-          field === "quantity" ||
-          field === "rate") &&
-        unitCost >= 0 &&
-        quantity > 0 &&
-        rateFraction >= 0
-      ) {
-        const valueSales = unitCost * quantity;
-        // Use integer sales tax for FBR
-        const salesTax = Math.round(valueSales * rateFraction);
-        const totalValues = valueSales + salesTax;
-        const withheld = salesTax;
-
-        // Debug log
-        console.log({
-          valueSalesExcludingST: unitCost,
-          rate: item.rate,
-          rateFraction,
-          salesTaxApplicable: salesTax,
-          calculated: Math.round(unitCost * rateFraction * 100) / 100
-        });
-
-        item.valueSalesExcludingST = unitCost;
-        item.salesTaxApplicable = salesTax;
-        item.totalValues = totalValues;
-        item.salesTaxWithheldAtSource = withheld;
-
-        item.extraTax = "";
+      // If rate is 'Exempt', set all calculated fields to 0
+      if (item.rate && (item.rate.toLowerCase() === 'exempt' || value.toLowerCase() === 'exempt')) {
+        item.valueSalesExcludingST = 0;
+        item.salesTaxApplicable = 0;
+        item.totalValues = 0;
+        item.salesTaxWithheldAtSource = 0;
+        item.extraTax = 0;
         item.furtherTax = 0;
         item.fedPayable = 0;
         item.discount = 0;
+      } else if (field !== "valueSalesExcludingST") {
+        let rateFraction = parseFloat((item.rate || "0").replace("%", "")) / 100;
+        const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
+        const quantity = parseFloat(item.quantity || 0);
+        // Only auto-calculate if not manually overridden
+        let valueSales = item.valueSalesExcludingST;
+        if (!item.isValueSalesManual) {
+          valueSales = unitCost * quantity;
+          item.valueSalesExcludingST = valueSales;
+        }
+        if (
+          (field === "fixedNotifiedValueOrRetailPrice" ||
+            field === "quantity" ||
+            field === "rate") &&
+          unitCost >= 0 &&
+          quantity > 0 &&
+          rateFraction >= 0
+        ) {
+          // Use integer sales tax for FBR
+          const salesTax = Math.round(valueSales * rateFraction);
+          const totalValues = valueSales + salesTax;
+          const withheld = salesTax;
+
+          // Debug log
+          console.log({
+            valueSalesExcludingST: valueSales,
+            rate: item.rate,
+            rateFraction,
+            salesTaxApplicable: salesTax,
+            calculated: Math.round(valueSales * rateFraction * 100) / 100
+          });
+
+          item.salesTaxApplicable = salesTax;
+          item.totalValues = totalValues;
+          item.salesTaxWithheldAtSource = withheld;
+
+          item.extraTax = "";
+          item.furtherTax = 0;
+          item.fedPayable = 0;
+          item.discount = 0;
+        }
       }
 
       updatedItems[index] = item;
@@ -244,6 +294,7 @@ export default function CreateInvoice() {
           saleType, // <-- set saleType here
           isSROScheduleEnabled: false,
           isSROItemEnabled: false,
+          isValueSalesManual: false,
         },
       ],
     }));
@@ -324,6 +375,7 @@ export default function CreateInvoice() {
             "",
           isSROScheduleEnabled: false,
           isSROItemEnabled: false,
+          isValueSalesManual: false,
         })),
       }));
     } else {
@@ -480,12 +532,11 @@ export default function CreateInvoice() {
             field: "quantity",
             message: `Quantity is required for item ${index + 1}`,
           },
-          {
+          // Only require valueSalesExcludingST if rate is not Exempt
+          ...((item.rate && item.rate.toLowerCase() === 'exempt') ? [] : [{
             field: "valueSalesExcludingST",
-            message: `Value Sales Excluding ST is required for item ${
-              index + 1
-            }`,
-          },
+            message: `Value Sales Excluding ST is required for item ${index + 1}`,
+          }]),
           {
             field: "salesTaxApplicable",
             message: `Sales Tax Applicable is required for item ${index + 1}`,
@@ -567,6 +618,9 @@ export default function CreateInvoice() {
                 title: "Success",
                 text: `Invoice submitted successfully! Invoice Number: ${postRes.data.invoiceNumber}`,
                 confirmButtonColor: "#28a745",
+                willClose: () => {
+                  navigate('/yourinvoices');
+                }
               });
               setIsPrintable(true);
             }
@@ -910,25 +964,7 @@ export default function CreateInvoice() {
           }}
         >
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 2 }}>
-            <SROItem
-              key={`SROItem-${index}`}
-              index={index}
-              disabled={!item.isSROItemEnabled}
-              item={item}
-              handleItemChange={handleItemChange}
-              SROId={localStorage.getItem("SROId")}
-            />
-
-            <SROScheduleNumber
-              key={`SROScheduleNumber-${index}`}
-              index={index}
-              item={item}
-              disabled={!item.isSROScheduleEnabled}
-              handleItemChange={handleItemChange}
-              RateId={localStorage.getItem("selectedRateId")}
-              selectedProvince={formData.buyerProvince}
-            />
-
+            {/* Move HS Code to the first field */}
             <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
               <Autocomplete
                 fullWidth
@@ -952,7 +988,23 @@ export default function CreateInvoice() {
                 }
               />
             </Box>
-
+            <SROItem
+              key={`SROItem-${index}`}
+              index={index}
+              disabled={!item.isSROItemEnabled}
+              item={item}
+              handleItemChange={handleItemChange}
+              SROId={localStorage.getItem("SROId")}
+            />
+            <SROScheduleNumber
+              key={`SROScheduleNumber-${index}`}
+              index={index}
+              item={item}
+              disabled={!item.isSROScheduleEnabled}
+              handleItemChange={handleItemChange}
+              RateId={localStorage.getItem("selectedRateId")}
+              selectedProvince={formData.buyerProvince}
+            />
             <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
               <TextField
                 fullWidth
@@ -1030,7 +1082,6 @@ export default function CreateInvoice() {
                   )
                 }
                 variant="outlined"
-                InputProps={{ readOnly: true }}
               />
             </Box>
 
@@ -1165,11 +1216,29 @@ export default function CreateInvoice() {
             variant="contained"
             color="primary"
             sx={{ mr: 2 }}
+            disabled={loading}
           >
-            Submit
+            {loading ? <span className="loader" style={{ display: 'inline-block', width: 22, height: 22, border: '3px solid #fff', borderTop: '3px solid #1976d2', borderRadius: '50%', animation: 'spin 1s linear infinite', verticalAlign: 'middle' }} /> : 'Submit'}
           </Button>
         </Box>
       </Box>
+      {/* Full screen loader overlay */}
+      {loading && (
+        <Box sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          bgcolor: 'rgba(255,255,255,0.7)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <span className="loader" style={{ display: 'inline-block', width: 60, height: 60, border: '6px solid #1976d2', borderTop: '6px solid #fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        </Box>
+      )}
     </Box>
   );
 }
