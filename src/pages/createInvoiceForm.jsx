@@ -8,6 +8,7 @@ import {
   FormControl,
   Typography,
   Autocomplete,
+  CircularProgress,
 } from "@mui/material";
 import { DemoContainer } from "@mui/x-date-pickers/internals/demo";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -236,7 +237,7 @@ export default function CreateInvoice() {
         {
           hsCode: "",
           productDescription: "",
-          rate: "18%",
+          rate: "",
           uoM: "",
           quantity: 1,
           totalValues: 0,
@@ -1091,19 +1092,7 @@ export default function CreateInvoice() {
             disabled={loading}
           >
             {loading ? (
-              <span
-                className="loader"
-                style={{
-                  display: "inline-block",
-                  width: 22,
-                  height: 22,
-                  border: "3px solid #fff",
-                  borderTop: "3px solid #1976d2",
-                  borderRadius: "50%",
-                  animation: "spin 1s linear infinite",
-                  verticalAlign: "middle",
-                }}
-              />
+              <CircularProgress size={24} color="inherit" />
             ) : (
               "Submit"
             )}
@@ -1125,18 +1114,7 @@ export default function CreateInvoice() {
             justifyContent: "center",
           }}
         >
-          <span
-            className="loader"
-            style={{
-              display: "inline-block",
-              width: 60,
-              height: 60,
-              border: "6px solid #1976d2",
-              borderTop: "6px solid #fff",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-            }}
-          />
+          <CircularProgress size={50} color="primary" />
         </Box>
       )}
     </Box>

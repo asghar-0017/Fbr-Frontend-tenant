@@ -40,6 +40,7 @@ const RateSelector = ({
         "responseresponseresponseresponseresponseresponseresponseresponseresponseresponse",
         response
       );
+      console.log("Transaction Type ID:", transctionId);
       setRates(response);
       return response;
     } catch (error) {
