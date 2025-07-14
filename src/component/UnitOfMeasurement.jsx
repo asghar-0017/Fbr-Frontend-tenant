@@ -8,18 +8,21 @@ const UnitOfMeasurement = ({ index, item, handleItemChange, hsCode }) => {
   useEffect(() => {
     const getUoM = async () => {
       if (!hsCode) return;
-
+      console.log("Fetching UOM for hsCode:", hsCode); // Debug log
       try {
         const response = await fetchData(
           `pdi/v2/HS_UOM?hs_code=${hsCode}&annexure_id=3`
         );
-        console.log("UOMMMMMMMMMMMMMMMMMMMMMMMMMM ITEM RESPONSE", response);
+        console.log("UOM API response:", response); // Debug log
         setUom(response);
+        // Auto-select if only one UOM is returned and not already set
+        if (response.length === 1 && !item.uoM) {
+          handleItemChange(index, "uoM", response[0].description);
+        }
       } catch (error) {
         console.error("Error fetching rates:", error);
       }
     };
-
     getUoM();
   }, [hsCode]);
 

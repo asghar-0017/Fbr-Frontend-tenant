@@ -77,7 +77,7 @@ export default function CreateInvoice() {
 
   React.useEffect(() => {
     const handleBeforeUnload = () => {
-      localStorage.clear(); // Clear all local storage
+      localStorage.clear();
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -102,20 +102,26 @@ export default function CreateInvoice() {
         localStorage.setItem("provinceResponse", JSON.stringify(response));
       }),
       fetch("https://gw.fbr.gov.pk/pdi/v1/itemdesccode", {
-        headers: { Authorization: `Bearer 63f756ee-69e4-3b5b-a3b7-0b8656624912` },
+        headers: {
+          Authorization: `Bearer 63f756ee-69e4-3b5b-a3b7-0b8656624912`,
+        },
       })
-        .then((response) => response.ok ? response.json() : Promise.reject())
-        .then((data) => setHsCodeList(data.map(item => ({ hS_CODE: item.hS_CODE }))))
+        .then((response) => (response.ok ? response.json() : Promise.reject()))
+        .then((data) =>
+          setHsCodeList(data.map((item) => ({ hS_CODE: item.hS_CODE })))
+        )
         .catch(() => setHsCodeList([])),
       fetch("https://gw.fbr.gov.pk/pdi/v1/doctypecode", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
-        .then((response) => response.ok ? response.json() : Promise.reject())
+        .then((response) => (response.ok ? response.json() : Promise.reject()))
         .then((data) => setInvoiceTypes(data))
-        .catch(() => setInvoiceTypes([
-          { docTypeId: 4, docDescription: "Sale Invoice" },
-          { docTypeId: 9, docDescription: "Debit Note" },
-        ])),
+        .catch(() =>
+          setInvoiceTypes([
+            { docTypeId: 4, docDescription: "Sale Invoice" },
+            { docTypeId: 9, docDescription: "Debit Note" },
+          ])
+        ),
       fetchData("pdi/v1/transtypecode").then((res) => setScenario(res)),
     ]).finally(() => setAllLoading(false));
   }, []);
@@ -176,7 +182,7 @@ export default function CreateInvoice() {
         item.valueSalesExcludingST = unitCost * quantity;
       }
 
-      // Update tax calculations if rate is not exempt and relevant fields are edited
+      // Update tax calculations
       if (
         item.rate &&
         item.rate.toLowerCase() !== "exempt" &&
@@ -194,14 +200,15 @@ export default function CreateInvoice() {
         item.salesTaxApplicable = salesTax;
         item.totalValues = valueSales + salesTax;
         item.salesTaxWithheldAtSource = salesTax;
-      } else if (
-        item.rate &&
-        (item.rate.toLowerCase() === "exempt" ||
-          value.toLowerCase() === "exempt")
-      ) {
-        item.valueSalesExcludingST = 0;
+      } else if (item.rate && item.rate.toLowerCase() === "exempt") {
+        // For exempt items, calculate valueSalesExcludingST but set taxes to 0
+        const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
+        const quantity = parseFloat(item.quantity || 0);
+        item.valueSalesExcludingST = item.isValueSalesManual
+          ? parseFloat(item.valueSalesExcludingST || 0)
+          : unitCost * quantity;
         item.salesTaxApplicable = 0;
-        item.totalValues = 0;
+        item.totalValues = item.valueSalesExcludingST;
         item.salesTaxWithheldAtSource = 0;
         item.extraTax = "";
         item.furtherTax = 0;
@@ -280,6 +287,9 @@ export default function CreateInvoice() {
           localDescription.trim().toLowerCase()
     );
 
+    const isExemptScenario = id === "SN006";
+    const defaultRate = isExemptScenario ? "exempt" : "18%";
+
     if (matchingApiRecord) {
       localStorage.setItem(
         "transactionTypeId",
@@ -291,30 +301,37 @@ export default function CreateInvoice() {
         ...prev,
         scenarioId: id,
         buyerRegistrationType: id === "SN001" ? "Registered" : "Unregistered",
-        items: prev.items.map((item) => ({
-          ...item,
-          productDescription: selectedScenario.description,
-          sroScheduleNo: "",
-          sroItemSerialNo: "",
-          rate: "18%",
-          fixedNotifiedValueOrRetailPrice: 0,
-          quantity: 1,
-          valueSalesExcludingST: 0,
-          salesTaxApplicable: 0,
-          totalValues: 0,
-          salesTaxWithheldAtSource: 0,
-          extraTax: "",
-          furtherTax: 0,
-          fedPayable: 0,
-          discount: 0,
-          saleType:
-            matchingApiRecord?.transactioN_DESC ??
-            selectedScenario.saleType ??
-            "",
-          isSROScheduleEnabled: false,
-          isSROItemEnabled: false,
-          isValueSalesManual: false,
-        })),
+        items: prev.items.map((item) => {
+          const unitCost = parseFloat(
+            item.fixedNotifiedValueOrRetailPrice || 0
+          );
+          const quantity = parseFloat(item.quantity || 1);
+          const valueSalesExcludingST = unitCost * quantity;
+          return {
+            ...item,
+            productDescription: selectedScenario.description,
+            sroScheduleNo: "",
+            sroItemSerialNo: "",
+            rate: defaultRate,
+            fixedNotifiedValueOrRetailPrice: unitCost,
+            quantity: quantity,
+            valueSalesExcludingST: isExemptScenario ? valueSalesExcludingST : 0,
+            salesTaxApplicable: isExemptScenario ? 0 : item.salesTaxApplicable,
+            totalValues: isExemptScenario ? valueSalesExcludingST : 0,
+            salesTaxWithheldAtSource: 0,
+            extraTax: "",
+            furtherTax: 0,
+            fedPayable: 0,
+            discount: 0,
+            saleType:
+              matchingApiRecord?.transactioN_DESC ??
+              selectedScenario.saleType ??
+              "",
+            isSROScheduleEnabled: false,
+            isSROItemEnabled: false,
+            isValueSalesManual: false,
+          };
+        }),
       }));
     } else {
       setFormData((prev) => ({
@@ -327,55 +344,6 @@ export default function CreateInvoice() {
   const handleSubmitChange = async () => {
     setLoading(true);
     try {
-      const requiredFields = [
-        { field: "invoiceType", message: "Invoice Type is required" },
-        { field: "invoiceDate", message: "Invoice Date is required" },
-        { field: "sellerNTNCNIC", message: "Seller NTN/CNIC is required" },
-        {
-          field: "sellerBusinessName",
-          message: "Seller Business Name is required",
-        },
-        { field: "sellerProvince", message: "Seller Province is required" },
-        { field: "sellerAddress", message: "Seller Address is required" },
-        {
-          field: "buyerBusinessName",
-          message: "Buyer Business Name is required",
-        },
-        { field: "buyerProvince", message: "Buyer Province is required" },
-        { field: "buyerAddress", message: "Buyer Address is required" },
-        {
-          field: "buyerRegistrationType",
-          message: "Buyer Registration Type is required",
-        },
-      ];
-
-      for (const { field, message } of requiredFields) {
-        if (!formData[field]) {
-          Swal.fire({
-            icon: "error",
-            title: "Error",
-            text: message,
-            confirmButtonColor: "#d33",
-          });
-          setLoading(false);
-          return;
-        }
-      }
-
-      if (
-        formData.buyerRegistrationType === "Registered" &&
-        !formData.buyerNTNCNIC
-      ) {
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: "Buyer NTN/CNIC is required for registered buyers",
-          confirmButtonColor: "#d33",
-        });
-        setLoading(false);
-        return;
-      }
-
       for (const [index, item] of formData.items.entries()) {
         const itemRequiredFields = [
           {
@@ -395,28 +363,43 @@ export default function CreateInvoice() {
             field: "quantity",
             message: `Quantity is required for item ${index + 1}`,
           },
+          {
+            field: "valueSalesExcludingST",
+            message: `Value Sales Excluding ST is required for item ${
+              index + 1
+            }`,
+          },
+          // {
+          //   field: "salesTaxApplicable",
+          //   message: `Sales Tax Applicable is required for item ${index + 1}`,
+          // },
+          // {
+          //   field: "saleType",
+          //   message: `Sale Type is required for item ${index + 1}`,
+          // },
           ...(item.rate && item.rate.toLowerCase() === "exempt"
-            ? []
-            : [
+            ? [
                 {
-                  field: "valueSalesExcludingST",
-                  message: `Value Sales Excluding ST is required for item ${
+                  field: "sroScheduleNo",
+                  message: `SRO Schedule Number is required for exempt item ${
                     index + 1
                   }`,
                 },
-              ]),
-          {
-            field: "salesTaxApplicable",
-            message: `Sales Tax Applicable is required for item ${index + 1}`,
-          },
-          {
-            field: "saleType",
-            message: `Sale Type is required for item ${index + 1}`,
-          },
+                {
+                  field: "sroItemSerialNo",
+                  message: `SRO Item Serial Number is required for exempt item ${
+                    index + 1
+                  }`,
+                },
+              ]
+            : []),
         ];
 
         for (const { field, message } of itemRequiredFields) {
-          if (!item[field]) {
+          if (
+            !item[field] ||
+            (field === "valueSalesExcludingST" && item[field] <= 0)
+          ) {
             Swal.fire({
               icon: "error",
               title: "Error",
@@ -850,8 +833,9 @@ export default function CreateInvoice() {
                     "hsCode",
                     newValue ? newValue.hS_CODE : ""
                   );
-                  // Set productDescription from scenarioData, not from HS code
-                  const selectedScenario = scenarioData.find((s) => s.id === formData.scenarioId);
+                  const selectedScenario = scenarioData.find(
+                    (s) => s.id === formData.scenarioId
+                  );
                   handleItemChange(
                     index,
                     "productDescription",
@@ -865,11 +849,10 @@ export default function CreateInvoice() {
                   option.hS_CODE === value.hS_CODE
                 }
                 filterOptions={(options, { inputValue }) =>
-                  options.filter(
-                    (option) =>
-                      option.hS_CODE
-                        .toLowerCase()
-                        .includes(inputValue.toLowerCase())
+                  options.filter((option) =>
+                    option.hS_CODE
+                      .toLowerCase()
+                      .includes(inputValue.toLowerCase())
                   )
                 }
               />
@@ -880,7 +863,7 @@ export default function CreateInvoice() {
               item={item}
               handleItemChange={handleItemChange}
               transactionTypeId={localStorage.getItem("transactionTypeId")}
-              selectedProvince={formData.buyerProvince}
+              selectedProvince={formData.sellerProvince}
             />
             <SROScheduleNumber
               key={`SROScheduleNumber-${index}`}
@@ -889,7 +872,7 @@ export default function CreateInvoice() {
               disabled={!item.isSROScheduleEnabled}
               handleItemChange={handleItemChange}
               RateId={localStorage.getItem("selectedRateId")}
-              selectedProvince={formData.buyerProvince}
+              selectedProvince={formData.sellerProvince}
             />
             <SROItem
               key={`SROItem-${index}`}
@@ -918,7 +901,7 @@ export default function CreateInvoice() {
               index={index}
               item={item}
               handleItemChange={handleItemChange}
-              hsCode="0304.5400"
+              hsCode={item.hsCode}
             />
           </Box>
 
