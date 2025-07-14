@@ -73,6 +73,7 @@ export default function CreateInvoice() {
   const [hsCodeList, setHsCodeList] = React.useState([]);
   const [invoiceTypes, setInvoiceTypes] = React.useState([]);
   const navigate = useNavigate();
+  const [allLoading, setAllLoading] = React.useState(true);
 
   React.useEffect(() => {
     const handleBeforeUnload = () => {
@@ -93,68 +94,30 @@ export default function CreateInvoice() {
     }));
   };
 
-  const getProvince = async () => {
-    try {
-      const response = await fetchData("pdi/v1/provinces");
-      console.log("Province Response:", response);
-      setProvince(response);
-      localStorage.setItem("provinceResponse", JSON.stringify(response));
-    } catch (error) {
-      console.error("Error fetching provinces:", error);
-    }
-  };
-
   React.useEffect(() => {
-    getProvince();
-  }, []);
-
-  React.useEffect(() => {
-    const fetchHsCodes = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(
-          "https://gw.fbr.gov.pk/pdi/v1/itemdesccode",
-          {
-            headers: { Authorization: `Bearer 63f756ee-69e4-3b5b-a3b7-0b8656624912` },
-          }
-        );
-        if (!response.ok) throw new Error("Failed to fetch HS Codes");
-        const data = await response.json();
-        setHsCodeList(data);
-      } catch (error) {
-        setHsCodeList([
-          { hS_CODE: "0304.5400", description: "Sample Fish" },
-          { hS_CODE: "0101.2100", description: "Sample Animal" },
-          { hS_CODE: "0207.1400", description: "Sample Poultry" },
-          { hS_CODE: "0402.2100", description: "Sample Dairy" },
-          { hS_CODE: "0703.1000", description: "Sample Veg" },
-        ]);
-      }
-    };
-    fetchHsCodes();
-  }, []);
-
-  React.useEffect(() => {
-    const fetchInvoiceTypes = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(
-          "https://gw.fbr.gov.pk/pdi/v1/doctypecode",
-          {
-            headers: { Authorization: `Bearer 63f756ee-69e4-3b5b-a3b7-0b8656624912` },
-          }
-        );
-        if (!response.ok) throw new Error("Failed to fetch invoice types");
-        const data = await response.json();
-        setInvoiceTypes(data);
-      } catch (error) {
-        setInvoiceTypes([
+    setAllLoading(true);
+    Promise.allSettled([
+      fetchData("pdi/v1/provinces").then((response) => {
+        setProvince(response);
+        localStorage.setItem("provinceResponse", JSON.stringify(response));
+      }),
+      fetch("https://gw.fbr.gov.pk/pdi/v1/itemdesccode", {
+        headers: { Authorization: `Bearer 63f756ee-69e4-3b5b-a3b7-0b8656624912` },
+      })
+        .then((response) => response.ok ? response.json() : Promise.reject())
+        .then((data) => setHsCodeList(data.map(item => ({ hS_CODE: item.hS_CODE }))))
+        .catch(() => setHsCodeList([])),
+      fetch("https://gw.fbr.gov.pk/pdi/v1/doctypecode", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      })
+        .then((response) => response.ok ? response.json() : Promise.reject())
+        .then((data) => setInvoiceTypes(data))
+        .catch(() => setInvoiceTypes([
           { docTypeId: 4, docDescription: "Sale Invoice" },
           { docTypeId: 9, docDescription: "Debit Note" },
-        ]);
-      }
-    };
-    fetchInvoiceTypes();
+        ])),
+      fetchData("pdi/v1/transtypecode").then((res) => setScenario(res)),
+    ]).finally(() => setAllLoading(false));
   }, []);
 
   const handleItemChange = (index, field, value) => {
@@ -295,20 +258,6 @@ export default function CreateInvoice() {
       items: prev.items.filter((_, i) => i !== index),
     }));
   };
-
-  const getScenarioData = async () => {
-    localStorage.setItem("token", "63f756ee-69e4-3b5b-a3b7-0b8656624912");
-    try {
-      const res = await fetchData("pdi/v1/transtypecode");
-      setScenario(res);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  React.useEffect(() => {
-    getScenarioData();
-  }, []);
 
   const handleScenarioChange = (id) => {
     const selectedScenario = scenarioData.find((item) => item.id === id);
@@ -901,10 +850,12 @@ export default function CreateInvoice() {
                     "hsCode",
                     newValue ? newValue.hS_CODE : ""
                   );
+                  // Set productDescription from scenarioData, not from HS code
+                  const selectedScenario = scenarioData.find((s) => s.id === formData.scenarioId);
                   handleItemChange(
                     index,
                     "productDescription",
-                    newValue ? newValue.description : ""
+                    selectedScenario ? selectedScenario.description : ""
                   );
                 }}
                 renderInput={(params) => (
@@ -917,9 +868,6 @@ export default function CreateInvoice() {
                   options.filter(
                     (option) =>
                       option.hS_CODE
-                        .toLowerCase()
-                        .includes(inputValue.toLowerCase()) ||
-                      option.description
                         .toLowerCase()
                         .includes(inputValue.toLowerCase())
                   )
@@ -1179,7 +1127,7 @@ export default function CreateInvoice() {
           </Button>
         </Box>
       </Box>
-      {loading && (
+      {allLoading && (
         <Box
           sx={{
             position: "fixed",
