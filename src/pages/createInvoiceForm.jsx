@@ -23,7 +23,7 @@ import SROItem from "../component/SROItem";
 import UnitOfMeasurement from "../component/UnitOfMeasurement";
 import Swal from "sweetalert2";
 import axios from "axios";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 
 export default function CreateInvoice() {
   const [formData, setFormData] = React.useState({
@@ -42,7 +42,7 @@ export default function CreateInvoice() {
     scenarioId: "",
     items: [
       {
-        hsCode: "0304.5400",
+        hsCode: "",
         productDescription: "",
         rate: "",
         uoM: "",
@@ -81,7 +81,6 @@ export default function CreateInvoice() {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
 
-    // Cleanup the event listener when the component unmounts
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
@@ -104,6 +103,7 @@ export default function CreateInvoice() {
       console.error("Error fetching provinces:", error);
     }
   };
+
   React.useEffect(() => {
     getProvince();
   }, []);
@@ -112,20 +112,22 @@ export default function CreateInvoice() {
     const fetchHsCodes = async () => {
       try {
         const token = localStorage.getItem("token");
-        const response = await fetch("https://gw.fbr.gov.pk/pdi/v1/itemdesccode", {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await fetch(
+          "https://gw.fbr.gov.pk/pdi/v1/itemdesccode",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
         if (!response.ok) throw new Error("Failed to fetch HS Codes");
         const data = await response.json();
         setHsCodeList(data);
       } catch (error) {
-        // fallback to static list if API fails
         setHsCodeList([
           { hS_CODE: "0304.5400", description: "Sample Fish" },
           { hS_CODE: "0101.2100", description: "Sample Animal" },
           { hS_CODE: "0207.1400", description: "Sample Poultry" },
           { hS_CODE: "0402.2100", description: "Sample Dairy" },
-          { hS_CODE: "0703.1000", description: "Sample Veg" }
+          { hS_CODE: "0703.1000", description: "Sample Veg" },
         ]);
       }
     };
@@ -136,16 +138,19 @@ export default function CreateInvoice() {
     const fetchInvoiceTypes = async () => {
       try {
         const token = localStorage.getItem("token");
-        const response = await fetch("https://gw.fbr.gov.pk/pdi/v1/doctypecode", {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await fetch(
+          "https://gw.fbr.gov.pk/pdi/v1/doctypecode",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
         if (!response.ok) throw new Error("Failed to fetch invoice types");
         const data = await response.json();
         setInvoiceTypes(data);
       } catch (error) {
         setInvoiceTypes([
           { docTypeId: 4, docDescription: "Sale Invoice" },
-          { docTypeId: 9, docDescription: "Debit Note" }
+          { docTypeId: 9, docDescription: "Debit Note" },
         ]);
       }
     };
@@ -157,49 +162,40 @@ export default function CreateInvoice() {
       const updatedItems = [...prev.items];
       const item = { ...updatedItems[index] };
 
-      if (field === "quantity") {
-        item.quantity = value === "" ? "" : parseInt(value, 10) || 0;
-        // Only auto-calculate if not manually overridden
-        if (!item.isValueSalesManual) {
-          const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
-          const quantity = parseFloat(item.quantity || 0);
-          item.valueSalesExcludingST = unitCost * quantity;
-        }
-      } else if (field === "fixedNotifiedValueOrRetailPrice") {
-        item.fixedNotifiedValueOrRetailPrice = value === "" ? 0 : parseFloat(value);
-        if (!item.isValueSalesManual) {
-          const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
-          const quantity = parseFloat(item.quantity || 0);
-          item.valueSalesExcludingST = unitCost * quantity;
-        }
-      } else if (field === "valueSalesExcludingST") {
-        // Allow direct editing and recalculate dependent fields
-        item.valueSalesExcludingST = value === "" ? 0 : parseFloat(value);
-        item.isValueSalesManual = true;
-        if (item.rate && item.rate.toLowerCase() !== 'exempt') {
-          let rateFraction = parseFloat((item.rate || "0").replace("%", "")) / 100;
-          const valueSales = item.valueSalesExcludingST;
-          const salesTax = Math.round(valueSales * rateFraction);
-          const totalValues = valueSales + salesTax;
-          const withheld = salesTax;
-          item.salesTaxApplicable = salesTax;
-          item.totalValues = totalValues;
-          item.salesTaxWithheldAtSource = withheld;
-        } else {
-          item.salesTaxApplicable = 0;
-          item.totalValues = 0;
-          item.salesTaxWithheldAtSource = 0;
+      // Parse numeric values, handling empty strings
+      const parseValue = (val, isFloat = true) =>
+        val === "" ? (isFloat ? 0 : "") : isFloat ? parseFloat(val) || 0 : val;
+
+      // Handle all editable fields
+      if (
+        [
+          "quantity",
+          "fixedNotifiedValueOrRetailPrice",
+          "valueSalesExcludingST",
+          "salesTaxApplicable",
+          "totalValues",
+          "salesTaxWithheldAtSource",
+          "extraTax",
+          "furtherTax",
+          "fedPayable",
+          "discount",
+        ].includes(field)
+      ) {
+        item[field] = parseValue(value, field !== "extraTax");
+        if (field === "valueSalesExcludingST") {
+          item.isValueSalesManual = true;
         }
       } else {
         item[field] = value;
       }
 
+      // Handle SRO-related fields
       if (field === "rate" && value) {
         item.isSROScheduleEnabled = true;
         item.sroScheduleNo = "";
         item.sroItemSerialNo = "";
         item.isSROItemEnabled = false;
-        item.isValueSalesManual = false; // Reset manual override on rate change
+        item.isValueSalesManual = false;
       }
 
       if (field === "sroScheduleNo" && value) {
@@ -207,57 +203,47 @@ export default function CreateInvoice() {
         item.sroItemSerialNo = "";
       }
 
-      // If rate is 'Exempt', set all calculated fields to 0
-      if (item.rate && (item.rate.toLowerCase() === 'exempt' || value.toLowerCase() === 'exempt')) {
+      // Calculate dependent fields if not manually overridden
+      if (
+        !item.isValueSalesManual &&
+        (field === "quantity" || field === "fixedNotifiedValueOrRetailPrice")
+      ) {
+        const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
+        const quantity = parseFloat(item.quantity || 0);
+        item.valueSalesExcludingST = unitCost * quantity;
+      }
+
+      // Update tax calculations if rate is not exempt and relevant fields are edited
+      if (
+        item.rate &&
+        item.rate.toLowerCase() !== "exempt" &&
+        [
+          "quantity",
+          "fixedNotifiedValueOrRetailPrice",
+          "valueSalesExcludingST",
+          "rate",
+        ].includes(field)
+      ) {
+        const rateFraction =
+          parseFloat((item.rate || "0").replace("%", "")) / 100;
+        const valueSales = parseFloat(item.valueSalesExcludingST || 0);
+        const salesTax = Math.round(valueSales * rateFraction);
+        item.salesTaxApplicable = salesTax;
+        item.totalValues = valueSales + salesTax;
+        item.salesTaxWithheldAtSource = salesTax;
+      } else if (
+        item.rate &&
+        (item.rate.toLowerCase() === "exempt" ||
+          value.toLowerCase() === "exempt")
+      ) {
         item.valueSalesExcludingST = 0;
         item.salesTaxApplicable = 0;
         item.totalValues = 0;
         item.salesTaxWithheldAtSource = 0;
-        item.extraTax = 0;
+        item.extraTax = "";
         item.furtherTax = 0;
         item.fedPayable = 0;
         item.discount = 0;
-      } else if (field !== "valueSalesExcludingST") {
-        let rateFraction = parseFloat((item.rate || "0").replace("%", "")) / 100;
-        const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
-        const quantity = parseFloat(item.quantity || 0);
-        // Only auto-calculate if not manually overridden
-        let valueSales = item.valueSalesExcludingST;
-        if (!item.isValueSalesManual) {
-          valueSales = unitCost * quantity;
-          item.valueSalesExcludingST = valueSales;
-        }
-        if (
-          (field === "fixedNotifiedValueOrRetailPrice" ||
-            field === "quantity" ||
-            field === "rate") &&
-          unitCost >= 0 &&
-          quantity > 0 &&
-          rateFraction >= 0
-        ) {
-          // Use integer sales tax for FBR
-          const salesTax = Math.round(valueSales * rateFraction);
-          const totalValues = valueSales + salesTax;
-          const withheld = salesTax;
-
-          // Debug log
-          console.log({
-            valueSalesExcludingST: valueSales,
-            rate: item.rate,
-            rateFraction,
-            salesTaxApplicable: salesTax,
-            calculated: Math.round(valueSales * rateFraction * 100) / 100
-          });
-
-          item.salesTaxApplicable = salesTax;
-          item.totalValues = totalValues;
-          item.salesTaxWithheldAtSource = withheld;
-
-          item.extraTax = "";
-          item.furtherTax = 0;
-          item.fedPayable = 0;
-          item.discount = 0;
-        }
       }
 
       updatedItems[index] = item;
@@ -266,9 +252,12 @@ export default function CreateInvoice() {
   };
 
   const addNewItem = () => {
-    // Find the selected scenario's saleType
-    const selectedScenario = scenarioData.find((item) => item.id === formData.scenarioId);
-    const saleType = selectedScenario ? selectedScenario.saleType : "Goods at Standard Rate (default)";
+    const selectedScenario = scenarioData.find(
+      (item) => item.id === formData.scenarioId
+    );
+    const saleType = selectedScenario
+      ? selectedScenario.saleType
+      : "Goods at Standard Rate (default)";
 
     setFormData((prev) => ({
       ...prev,
@@ -291,7 +280,7 @@ export default function CreateInvoice() {
           furtherTax: 0,
           fedPayable: 0,
           discount: 0,
-          saleType, // <-- set saleType here
+          saleType,
           isSROScheduleEnabled: false,
           isSROItemEnabled: false,
           isValueSalesManual: false,
@@ -386,82 +375,9 @@ export default function CreateInvoice() {
     }
   };
 
-  // const handleSubmitChange = async () => {
-  //   setLoading(true);
-  //   try {
-  //     const cleanedItems = formData.items.map(
-  //       ({ isSROScheduleEnabled, isSROItemEnabled, ...rest }) => ({
-  //         ...rest,
-  //         sroScheduleNo:
-  //           rest.sroScheduleNo?.trim() !== "" ? rest.sroScheduleNo : "",
-  //         sroItemSerialNo:
-  //           rest.sroItemSerialNo?.trim() !== "" ? rest.sroItemSerialNo : "",
-  //         productDescription:
-  //           rest.productDescription?.trim() !== ""
-  //             ? rest.productDescription
-  //             : "N/A",
-  //         saleType:
-  //           rest.saleType?.trim() !== ""
-  //             ? rest.saleType
-  //             : "Goods at standard rate (default)",
-  //       })
-  //     );
-
-  //     const cleanedData = {
-  //       ...formData,
-  //       invoiceDate: dayjs(formData.invoiceDate).format("YYYY-MM-DD"),
-  //       items: cleanedItems,
-  //     };
-
-  //     const res = await postData(
-  //       "di_data/v1/di/validateinvoicedata_sb",
-  //       cleanedData
-  //     );
-
-  //     if (
-  //       res.status === 200 &&
-  //       res?.data?.validationResponse?.statusCode === "01"
-  //     ) {
-  //       Swal.fire({
-  //         icon: "error",
-  //         title: "Error",
-  //         text:
-  //           res?.data?.validationResponse?.error ||
-  //           "Invoice submission failed.",
-  //         confirmButtonColor: "#d33",
-  //       });
-  //       setIsPrintable(true); // Enable print option after successful submission
-  //     }
-
-  //     if (
-  //       res.status === 200 &&
-  //       res?.data?.validationResponse?.statusCode === "00"
-  //     ) {
-  //       Swal.fire({
-  //         icon: "success",
-  //         title: "Success",
-  //         text: "Invoice submitted successfully!",
-  //         confirmButtonColor: "#28a745",
-  //       });
-  //       setIsPrintable(true); // Enable print option after successful submission
-  //     }
-  //   } catch (error) {
-  //     Swal.fire({
-  //       icon: "error",
-  //       title: "Error",
-  //       text: "Failed to submit the invoice. Please try again.",
-  //       confirmButtonText: "OK",
-  //       confirmButtonColor: "#d33",
-  //     });
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
   const handleSubmitChange = async () => {
     setLoading(true);
     try {
-      // Validate required fields (unchanged from previous response)
       const requiredFields = [
         { field: "invoiceType", message: "Invoice Type is required" },
         { field: "invoiceDate", message: "Invoice Date is required" },
@@ -497,7 +413,6 @@ export default function CreateInvoice() {
         }
       }
 
-      // Validate buyerNTNCNIC for registered buyers
       if (
         formData.buyerRegistrationType === "Registered" &&
         !formData.buyerNTNCNIC
@@ -512,7 +427,6 @@ export default function CreateInvoice() {
         return;
       }
 
-      // Validate items
       for (const [index, item] of formData.items.entries()) {
         const itemRequiredFields = [
           {
@@ -532,11 +446,16 @@ export default function CreateInvoice() {
             field: "quantity",
             message: `Quantity is required for item ${index + 1}`,
           },
-          // Only require valueSalesExcludingST if rate is not Exempt
-          ...((item.rate && item.rate.toLowerCase() === 'exempt') ? [] : [{
-            field: "valueSalesExcludingST",
-            message: `Value Sales Excluding ST is required for item ${index + 1}`,
-          }]),
+          ...(item.rate && item.rate.toLowerCase() === "exempt"
+            ? []
+            : [
+                {
+                  field: "valueSalesExcludingST",
+                  message: `Value Sales Excluding ST is required for item ${
+                    index + 1
+                  }`,
+                },
+              ]),
           {
             field: "salesTaxApplicable",
             message: `Sales Tax Applicable is required for item ${index + 1}`,
@@ -578,11 +497,9 @@ export default function CreateInvoice() {
         items: cleanedItems,
       };
 
-      // Log token for debugging
       const token = localStorage.getItem("token");
       console.log("Token used:", token);
 
-      // Step 1: Validate invoice data
       const validateRes = await postData(
         "di_data/v1/di/validateinvoicedata_sb",
         cleanedData
@@ -592,7 +509,6 @@ export default function CreateInvoice() {
         validateRes.status === 200 &&
         validateRes.data.validationResponse.statusCode === "00"
       ) {
-        // Step 2: Post invoice data
         try {
           const postRes = await postData(
             "di_data/v1/di/postinvoicedata_sb",
@@ -619,8 +535,8 @@ export default function CreateInvoice() {
                 text: `Invoice submitted successfully! Invoice Number: ${postRes.data.invoiceNumber}`,
                 confirmButtonColor: "#28a745",
                 willClose: () => {
-                  navigate('/yourinvoices');
-                }
+                  navigate("/your-invoices");
+                },
               });
               setIsPrintable(true);
             }
@@ -674,12 +590,11 @@ export default function CreateInvoice() {
   };
 
   const handlePrintInvoice = () => {
-    printInvoice(formData); // Print the current form data
+    printInvoice(formData);
   };
 
   return (
     <Box sx={{ p: 3, backgroundColor: "#f0f2f5", borderRadius: 2, mt: 8 }}>
-      {/* Invoice Section */}
       <Typography
         variant="h6"
         sx={{
@@ -745,7 +660,6 @@ export default function CreateInvoice() {
         </Box>
       </Box>
 
-      {/* Seller Section */}
       <Typography
         variant="h6"
         sx={{
@@ -796,7 +710,10 @@ export default function CreateInvoice() {
                 onChange={(e) => handleChange("sellerProvince", e.target.value)}
               >
                 {province.map((prov) => (
-                  <MenuItem key={prov.stateProvinceCode} value={prov.stateProvinceDesc}>
+                  <MenuItem
+                    key={prov.stateProvinceCode}
+                    value={prov.stateProvinceDesc}
+                  >
                     {prov.stateProvinceDesc}
                   </MenuItem>
                 ))}
@@ -806,7 +723,6 @@ export default function CreateInvoice() {
         </Box>
       </Box>
 
-      {/* Buyer Section */}
       <Typography
         variant="h6"
         sx={{
@@ -855,7 +771,10 @@ export default function CreateInvoice() {
                 onChange={(e) => handleChange("buyerProvince", e.target.value)}
               >
                 {province.map((prov) => (
-                  <MenuItem key={prov.stateProvinceCode} value={prov.stateProvinceDesc}>
+                  <MenuItem
+                    key={prov.stateProvinceCode}
+                    value={prov.stateProvinceDesc}
+                  >
                     {prov.stateProvinceDesc}
                   </MenuItem>
                 ))}
@@ -872,7 +791,9 @@ export default function CreateInvoice() {
                 labelId="buyer-registration-type-label"
                 value={formData.buyerRegistrationType}
                 label="Buyer Registration Type"
-                onChange={(e) => handleChange("buyerRegistrationType", e.target.value)}
+                onChange={(e) =>
+                  handleChange("buyerRegistrationType", e.target.value)
+                }
                 inputProps={{ readOnly: formData.scenarioId === "SN001" }}
                 disabled={formData.scenarioId === "SN001"}
               >
@@ -884,7 +805,6 @@ export default function CreateInvoice() {
         </Box>
       </Box>
 
-      {/* Scenario ID Section */}
       <Typography
         variant="h6"
         sx={{
@@ -929,15 +849,17 @@ export default function CreateInvoice() {
             </FormControl>
           </Box>
         </Box>
-        {/* Show selected scenario description */}
         {formData.scenarioId && (
-          <Typography variant="body2" sx={{ mt: 1, ml: 2, color: 'text.secondary' }}>
-            {scenarioData.find((s) => s.id === formData.scenarioId)?.description || ''}
+          <Typography
+            variant="body2"
+            sx={{ mt: 1, ml: 2, color: "text.secondary" }}
+          >
+            {scenarioData.find((s) => s.id === formData.scenarioId)
+              ?.description || ""}
           </Typography>
         )}
       </Box>
 
-      {/* Items Section */}
       <Typography
         variant="h6"
         sx={{
@@ -964,37 +886,53 @@ export default function CreateInvoice() {
           }}
         >
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 2 }}>
-            {/* Move HS Code to the first field */}
             <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
               <Autocomplete
                 fullWidth
                 options={hsCodeList}
                 getOptionLabel={(option) => option.hS_CODE}
-                value={hsCodeList.find((code) => code.hS_CODE === item.hsCode) || null}
+                value={
+                  hsCodeList.find((code) => code.hS_CODE === item.hsCode) ||
+                  null
+                }
                 onChange={(_, newValue) => {
-                  handleItemChange(index, "hsCode", newValue ? newValue.hS_CODE : "");
-                  handleItemChange(index, "productDescription", newValue ? newValue.description : "");
+                  handleItemChange(
+                    index,
+                    "hsCode",
+                    newValue ? newValue.hS_CODE : ""
+                  );
+                  handleItemChange(
+                    index,
+                    "productDescription",
+                    newValue ? newValue.description : ""
+                  );
                 }}
                 renderInput={(params) => (
                   <TextField {...params} label="HS Code" variant="outlined" />
                 )}
-                isOptionEqualToValue={(option, value) => option.hS_CODE === value.hS_CODE}
+                isOptionEqualToValue={(option, value) =>
+                  option.hS_CODE === value.hS_CODE
+                }
                 filterOptions={(options, { inputValue }) =>
                   options.filter(
                     (option) =>
-                      option.hS_CODE.toLowerCase().includes(inputValue.toLowerCase()) ||
-                      option.description.toLowerCase().includes(inputValue.toLowerCase())
+                      option.hS_CODE
+                        .toLowerCase()
+                        .includes(inputValue.toLowerCase()) ||
+                      option.description
+                        .toLowerCase()
+                        .includes(inputValue.toLowerCase())
                   )
                 }
               />
             </Box>
-            <SROItem
-              key={`SROItem-${index}`}
+            <RateSelector
+              key={`RateSelector-${index}`}
               index={index}
-              disabled={!item.isSROItemEnabled}
               item={item}
               handleItemChange={handleItemChange}
-              SROId={localStorage.getItem("SROId")}
+              transactionTypeId={localStorage.getItem("transactionTypeId")}
+              selectedProvince={formData.buyerProvince}
             />
             <SROScheduleNumber
               key={`SROScheduleNumber-${index}`}
@@ -1005,6 +943,17 @@ export default function CreateInvoice() {
               RateId={localStorage.getItem("selectedRateId")}
               selectedProvince={formData.buyerProvince}
             />
+            <SROItem
+              key={`SROItem-${index}`}
+              index={index}
+              disabled={!item.isSROItemEnabled}
+              item={item}
+              handleItemChange={handleItemChange}
+              SROId={localStorage.getItem("SROId")}
+            />
+          </Box>
+
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 2 }}>
             <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
               <TextField
                 fullWidth
@@ -1016,24 +965,12 @@ export default function CreateInvoice() {
                 variant="outlined"
               />
             </Box>
-          </Box>
-
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 2 }}>
             <UnitOfMeasurement
               key={`UnitOfMeasurement-${index}`}
               index={index}
               item={item}
               handleItemChange={handleItemChange}
               hsCode="0304.5400"
-            />
-
-            <RateSelector
-              key={`RateSelector-${index}`}
-              index={index}
-              item={item}
-              handleItemChange={handleItemChange}
-              transactionTypeId={localStorage.getItem("transactionTypeId")}
-              selectedProvince={formData.buyerProvince}
             />
           </Box>
 
@@ -1095,7 +1032,6 @@ export default function CreateInvoice() {
                   handleItemChange(index, "salesTaxApplicable", e.target.value)
                 }
                 variant="outlined"
-                InputProps={{ readOnly: true }}
               />
             </Box>
 
@@ -1109,7 +1045,6 @@ export default function CreateInvoice() {
                   handleItemChange(index, "totalValues", e.target.value)
                 }
                 variant="outlined"
-                InputProps={{ readOnly: true }}
               />
             </Box>
           </Box>
@@ -1129,7 +1064,6 @@ export default function CreateInvoice() {
                   )
                 }
                 variant="outlined"
-                InputProps={{ readOnly: true }}
               />
             </Box>
             <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
@@ -1138,7 +1072,9 @@ export default function CreateInvoice() {
                 label="Extra Tax"
                 type="number"
                 value={item.extraTax}
-                onChange={(e) => handleItemChange(index, "extraTax", e.target.value)}
+                onChange={(e) =>
+                  handleItemChange(index, "extraTax", e.target.value)
+                }
                 variant="outlined"
               />
             </Box>
@@ -1148,7 +1084,9 @@ export default function CreateInvoice() {
                 label="Further Tax"
                 type="number"
                 value={item.furtherTax}
-                onChange={(e) => handleItemChange(index, "furtherTax", e.target.value)}
+                onChange={(e) =>
+                  handleItemChange(index, "furtherTax", e.target.value)
+                }
                 variant="outlined"
               />
             </Box>
@@ -1158,7 +1096,9 @@ export default function CreateInvoice() {
                 label="FED Payable"
                 type="number"
                 value={item.fedPayable}
-                onChange={(e) => handleItemChange(index, "fedPayable", e.target.value)}
+                onChange={(e) =>
+                  handleItemChange(index, "fedPayable", e.target.value)
+                }
                 variant="outlined"
               />
             </Box>
@@ -1168,7 +1108,9 @@ export default function CreateInvoice() {
                 label="Discount"
                 type="number"
                 value={item.discount}
-                onChange={(e) => handleItemChange(index, "discount", e.target.value)}
+                onChange={(e) =>
+                  handleItemChange(index, "discount", e.target.value)
+                }
                 variant="outlined"
               />
             </Box>
@@ -1205,7 +1147,6 @@ export default function CreateInvoice() {
         </Box>
       ))}
 
-      {/* Add and Submit Buttons */}
       <Box sx={{ display: "flex", justifyContent: "space-between", mt: 4 }}>
         <Button variant="contained" onClick={addNewItem} color="success">
           Add New Item
@@ -1218,25 +1159,53 @@ export default function CreateInvoice() {
             sx={{ mr: 2 }}
             disabled={loading}
           >
-            {loading ? <span className="loader" style={{ display: 'inline-block', width: 22, height: 22, border: '3px solid #fff', borderTop: '3px solid #1976d2', borderRadius: '50%', animation: 'spin 1s linear infinite', verticalAlign: 'middle' }} /> : 'Submit'}
+            {loading ? (
+              <span
+                className="loader"
+                style={{
+                  display: "inline-block",
+                  width: 22,
+                  height: 22,
+                  border: "3px solid #fff",
+                  borderTop: "3px solid #1976d2",
+                  borderRadius: "50%",
+                  animation: "spin 1s linear infinite",
+                  verticalAlign: "middle",
+                }}
+              />
+            ) : (
+              "Submit"
+            )}
           </Button>
         </Box>
       </Box>
-      {/* Full screen loader overlay */}
       {loading && (
-        <Box sx={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          bgcolor: 'rgba(255,255,255,0.7)',
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          <span className="loader" style={{ display: 'inline-block', width: 60, height: 60, border: '6px solid #1976d2', borderTop: '6px solid #fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <Box
+          sx={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            bgcolor: "rgba(255,255,255,0.7)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <span
+            className="loader"
+            style={{
+              display: "inline-block",
+              width: 60,
+              height: 60,
+              border: "6px solid #1976d2",
+              borderTop: "6px solid #fff",
+              borderRadius: "50%",
+              animation: "spin 1s linear infinite",
+            }}
+          />
         </Box>
       )}
     </Box>

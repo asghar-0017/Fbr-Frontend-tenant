@@ -81,13 +81,9 @@ const RateSelector = ({
           disabled={showScenarioMessage || showProvinceMessage}
         >
           {showScenarioMessage ? (
-            <MenuItem value="">
-              Please select scenario first
-            </MenuItem>
+            <MenuItem value="">Please select scenario first</MenuItem>
           ) : showProvinceMessage ? (
-            <MenuItem value="">
-              Please select province first
-            </MenuItem>
+            <MenuItem value="">Please select province first</MenuItem>
           ) : (
             rates.map((rate) => (
               <MenuItem key={rate.ratE_ID} value={rate.ratE_DESC}>
@@ -97,12 +93,12 @@ const RateSelector = ({
           )}
         </Select>
         {showScenarioMessage && (
-          <Box sx={{ color: 'error.main', fontSize: 13, mt: 0.5, ml: 1 }}>
+          <Box sx={{ color: "error.main", fontSize: 13, mt: 0.5, ml: 1 }}>
             Please select scenario first.
           </Box>
         )}
         {showProvinceMessage && (
-          <Box sx={{ color: 'error.main', fontSize: 13, mt: 0.5, ml: 1 }}>
+          <Box sx={{ color: "error.main", fontSize: 13, mt: 0.5, ml: 1 }}>
             Please select province first.
           </Box>
         )}
