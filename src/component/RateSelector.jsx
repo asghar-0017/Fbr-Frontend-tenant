@@ -66,22 +66,46 @@ const RateSelector = ({
     handleItemChange(index, "rate", selectedRate);
   };
 
+  const showScenarioMessage = !transactionTypeId;
+  const showProvinceMessage = !showScenarioMessage && !selectedProvince;
+
   return (
     <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
-      <FormControl fullWidth>
+      <FormControl fullWidth error={showScenarioMessage || showProvinceMessage}>
         <InputLabel id={`rate-${index}`}>Rate</InputLabel>
         <Select
           labelId={`rate-${index}`}
           value={item.rate || ""}
           label="Rate"
           onChange={handleRateChange}
+          disabled={showScenarioMessage || showProvinceMessage}
         >
-          {rates.map((rate) => (
-            <MenuItem key={rate.ratE_ID} value={rate.ratE_DESC}>
-              {rate.ratE_DESC}
+          {showScenarioMessage ? (
+            <MenuItem value="">
+              Please select scenario first
             </MenuItem>
-          ))}
+          ) : showProvinceMessage ? (
+            <MenuItem value="">
+              Please select province first
+            </MenuItem>
+          ) : (
+            rates.map((rate) => (
+              <MenuItem key={rate.ratE_ID} value={rate.ratE_DESC}>
+                {rate.ratE_DESC}
+              </MenuItem>
+            ))
+          )}
         </Select>
+        {showScenarioMessage && (
+          <Box sx={{ color: 'error.main', fontSize: 13, mt: 0.5, ml: 1 }}>
+            Please select scenario first.
+          </Box>
+        )}
+        {showProvinceMessage && (
+          <Box sx={{ color: 'error.main', fontSize: 13, mt: 0.5, ml: 1 }}>
+            Please select province first.
+          </Box>
+        )}
       </FormControl>
     </Box>
   );
