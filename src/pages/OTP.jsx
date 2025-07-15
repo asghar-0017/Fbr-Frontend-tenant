@@ -12,6 +12,9 @@ import LockIcon from "@mui/icons-material/Lock";
 import { Email } from "@mui/icons-material";
 import { MuiOtpInput } from "mui-one-time-password-input";
 import axios from "axios";
+import API_CONFIG from "../API/Api";
+
+const { apiKeyLocal } = API_CONFIG;
 
 const OTP = () => {
   const [otp, setOtp] = useState("");
@@ -29,7 +32,7 @@ const OTP = () => {
     setLoading(true);
     try {
       const response = await axios
-        .post("http://localhost:5150/verify-reset-code", { code: otp })
+        .post(`${apiKeyLocal}/verify-reset-code`, { code: otp })
         .then((res) => {
           navigate("/reset-password");
           console.log(res);

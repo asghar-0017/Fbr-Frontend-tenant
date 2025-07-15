@@ -27,7 +27,8 @@ import { Button } from "@mui/material";
 const navItems = [
   { name: "Invoice form", href: "/" },
   { name: "Your Invoices", href: "/your-invoices" },
-  { name: "Create invoices", href: "#" },
+  { name: "Register Buyer", href: "/register-buyer" },
+  // { name: "Registered Users", href: "/registered-users" },
   { name: "logout" },
 ];
 

@@ -11,6 +11,9 @@ import {
 import LockIcon from "@mui/icons-material/Lock";
 import { useAuth } from "../Context/AuthProvider";
 import axios from "axios";
+import API_CONFIG from "../API/Api";
+
+const { apiKeyLocal } = API_CONFIG;
 
 const ResetPassword = () => {
   const [newPassword, setNewPassword] = useState("");
@@ -43,7 +46,7 @@ const ResetPassword = () => {
     console.log("Sending reset request with:", { email, newPassword });
 
     try {
-      const response = await axios.put("http://localhost:5150/reset-password", {
+      const response = await axios.put(`${apiKeyLocal}/reset-password`, {
         email,
         newPassword,
       });

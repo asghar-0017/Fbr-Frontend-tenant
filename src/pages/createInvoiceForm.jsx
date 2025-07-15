@@ -25,15 +25,19 @@ import UnitOfMeasurement from "../component/UnitOfMeasurement";
 import Swal from "sweetalert2";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import API_CONFIG from "../API/Api";
+
+const { apiKeyLocal } = API_CONFIG;
 
 export default function CreateInvoice() {
   const [formData, setFormData] = React.useState({
     invoiceType: "",
     invoiceDate: dayjs(),
-    sellerNTNCNIC: "",
-    sellerBusinessName: "",
-    sellerProvince: "",
-    sellerAddress: "",
+    sellerNTNCNIC: "6386420",
+    sellerBusinessName: "Asghar Ali",
+    sellerProvince: "SINDH",
+    sellerAddress: "Innovative Solutions, Karachi",
     buyerNTNCNIC: "",
     buyerBusinessName: "",
     buyerProvince: "",
@@ -73,6 +77,8 @@ export default function CreateInvoice() {
   const [province, setProvince] = React.useState([]);
   const [hsCodeList, setHsCodeList] = React.useState([]);
   const [invoiceTypes, setInvoiceTypes] = React.useState([]);
+  const [buyers, setBuyers] = useState([]);
+  const [selectedBuyerId, setSelectedBuyerId] = useState("");
   const navigate = useNavigate();
   const [allLoading, setAllLoading] = React.useState(true);
 
@@ -92,7 +98,7 @@ export default function CreateInvoice() {
       }),
       fetch("https://gw.fbr.gov.pk/pdi/v1/itemdesccode", {
         headers: {
-          Authorization: `Bearer 63f756ee-69e4-3b5b-a3b7-0b8656624912`,
+          Authorization: `Bearer ${localStorage.getItem("sandBoxTestToken")}`,
         },
       })
         .then((response) => (response.ok ? response.json() : Promise.reject()))
@@ -114,6 +120,36 @@ export default function CreateInvoice() {
       fetchData("pdi/v1/transtypecode").then((res) => setScenario(res)),
     ]).finally(() => setAllLoading(false));
   }, []);
+
+  // Fetch buyers list on mount
+  useEffect(() => {
+    fetch(`${apiKeyLocal}/get-buyers`, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization:
+          "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFkbWluQGZici5jb20iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NTI1NjQyODMsImV4cCI6MTc1MjYwMDI4M30.dIVNuwse_PcrdESMPFfuzvPx8x8RtX0Fbl0ggFW1EMc",
+      },
+    })
+      .then((res) => res.json())
+      .then((data) => setBuyers(data.users || []))
+      .catch(() => setBuyers([]));
+  }, []);
+
+  // When buyer is selected, fill buyer fields
+  useEffect(() => {
+    if (!selectedBuyerId) return;
+    const buyer = buyers.find((b) => b._id === selectedBuyerId);
+    if (buyer) {
+      setFormData((prev) => ({
+        ...prev,
+        buyerNTNCNIC: buyer.buyerNTNCNIC || "",
+        buyerBusinessName: buyer.buyerBusinessName || "",
+        buyerProvince: buyer.buyerProvince || "",
+        buyerAddress: buyer.buyerAddress || "",
+        buyerRegistrationType: buyer.buyerRegistrationType || "",
+      }));
+    }
+  }, [selectedBuyerId, buyers]);
 
   const handleItemChange = (index, field, value) => {
     setFormData((prev) => {
@@ -576,6 +612,7 @@ export default function CreateInvoice() {
               value={formData.invoiceRefNo}
               onChange={(e) => handleChange("invoiceRefNo", e.target.value)}
               variant="outlined"
+              disabled={formData.invoiceType === "Sale Invoice"}
             />
           </Box>
         </Box>
@@ -615,6 +652,7 @@ export default function CreateInvoice() {
                 value={formData[field]}
                 onChange={(e) => handleChange(field, e.target.value)}
                 variant="outlined"
+                disabled={true}
               />
             </Box>
           ))}
@@ -629,6 +667,7 @@ export default function CreateInvoice() {
                 value={formData.sellerProvince}
                 label="Seller Province"
                 onChange={(e) => handleChange("sellerProvince", e.target.value)}
+                disabled={true}
               >
                 {province.map((prov) => (
                   <MenuItem
@@ -666,6 +705,27 @@ export default function CreateInvoice() {
         }}
       >
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+          {/* Buyer Dropdown */}
+          <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
+            <FormControl fullWidth>
+              <InputLabel id="buyer-list-label">Select Buyer</InputLabel>
+              <Select
+                labelId="buyer-list-label"
+                value={selectedBuyerId}
+                label="Select Buyer"
+                onChange={(e) => setSelectedBuyerId(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>Choose Buyer</em>
+                </MenuItem>
+                {buyers.map((buyer) => (
+                  <MenuItem key={buyer._id} value={buyer._id}>
+                    {buyer.buyerBusinessName} ({buyer.buyerNTNCNIC})
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
           {[
             { label: "Buyer NTN/CNIC", field: "buyerNTNCNIC" },
             { label: "Buyer Business Name", field: "buyerBusinessName" },
@@ -673,6 +733,7 @@ export default function CreateInvoice() {
           ].map(({ label, field }) => (
             <Box key={field} sx={{ flex: "1 1 30%", minWidth: "250px" }}>
               <TextField
+                disabled
                 fullWidth
                 label={label}
                 value={formData[field]}
@@ -683,45 +744,25 @@ export default function CreateInvoice() {
           ))}
 
           <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
-            <FormControl fullWidth>
-              <InputLabel id="buyer-province-label">Buyer Province</InputLabel>
-              <Select
-                labelId="buyer-province-label"
-                value={formData.buyerProvince}
-                label="Buyer Province"
-                onChange={(e) => handleChange("buyerProvince", e.target.value)}
-              >
-                {province.map((prov) => (
-                  <MenuItem
-                    key={prov.stateProvinceCode}
-                    value={prov.stateProvinceDesc}
-                  >
-                    {prov.stateProvinceDesc}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <TextField
+              fullWidth
+              label="Buyer Province"
+              disabled
+              value={formData.buyerProvince}
+              variant="outlined"
+              InputProps={{ readOnly: true }}
+            />
           </Box>
 
           <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
-            <FormControl fullWidth>
-              <InputLabel id="buyer-registration-type-label">
-                Buyer Registration Type
-              </InputLabel>
-              <Select
-                labelId="buyer-registration-type-label"
-                value={formData.buyerRegistrationType}
-                label="Buyer Registration Type"
-                onChange={(e) =>
-                  handleChange("buyerRegistrationType", e.target.value)
-                }
-                inputProps={{ readOnly: formData.scenarioId === "SN001" }}
-                disabled={formData.scenarioId === "SN001"}
-              >
-                <MenuItem value="Registered">Registered</MenuItem>
-                <MenuItem value="Unregistered">Unregistered</MenuItem>
-              </Select>
-            </FormControl>
+            <TextField
+              fullWidth
+              label="Buyer Registration Type"
+              value={formData.buyerRegistrationType}
+              variant="outlined"
+              disabled
+              InputProps={{ readOnly: true }}
+            />
           </Box>
         </Box>
       </Box>

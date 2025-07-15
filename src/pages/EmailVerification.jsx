@@ -11,6 +11,9 @@ import {
 import LockIcon from "@mui/icons-material/Lock";
 import { Email } from "@mui/icons-material";
 import axios from "axios";
+import API_CONFIG from "../API/Api";
+
+const { apiKeyLocal } = API_CONFIG;
 
 const EmailVerification = () => {
   const [email, setEmail] = useState("");
@@ -24,7 +27,7 @@ const EmailVerification = () => {
     setLoading(true);
     try {
       const response = await axios
-        .post("http://localhost:5150/forget-password", { email })
+        .post(`${apiKeyLocal}/forget-password`, { email })
         .then((res) => {
           navigate("/otp");
           localStorage.setItem("email", email);

@@ -32,10 +32,10 @@ export default function BasicTable() {
   const getMyInvoices = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      const sandBoxTestToken = localStorage.getItem("sandBoxTestToken");
       const res = await axios.get("http://45.55.137.96:5150/get-invoice-data", {
         headers: {
-          Authorization: `Bearer 63f756ee-69e4-3b5b-a3b7-0b8656624912`,
+          Authorization: `Bearer ${sandBoxTestToken}`,
         },
       });
       setInvoices(res.data.data);

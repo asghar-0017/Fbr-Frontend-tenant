@@ -2,6 +2,9 @@ import { createContext, useContext, useEffect, useState } from "react";
 import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import API_CONFIG from "../API/Api";
+
+const { apiKeyLocal } = API_CONFIG;
 
 const AuthContext = createContext();
 
@@ -13,7 +16,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await axios.post("http://localhost:5150/login", {
+      const response = await axios.post(`${apiKeyLocal}/login`, {
         email,
         password,
       });
@@ -40,7 +43,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       const token = localStorage.getItem("token");
-      await axios.get("http://localhost:5150/logout", {
+      await axios.get(`${apiKeyLocal}/logout`, {
         headers: {
           authorization: `Bearer ${token}`,
         },

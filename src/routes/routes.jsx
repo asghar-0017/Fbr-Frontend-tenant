@@ -10,6 +10,8 @@ import YourInvoices from "../pages/YourInvoices";
 import EmailVerification from "../pages/EmailVerification";
 import OTP from "../pages/OTP";
 import ResetPassword from "../pages/ResetPassword";
+import RegisterUser from "../pages/RegisterUser";
+import { RegisteredUsers } from "../pages/RegisteredUsers";
 
 const SidebarWithLogout = () => {
   const { logout } = useAuth();
@@ -35,6 +37,8 @@ const AppRouter = () => {
           >
             <Route index element={<CreateInvoice />} />
             <Route path="your-invoices" element={<YourInvoices />} />
+            <Route path="register-buyer" element={<RegisterUser />} />
+            <Route path="registered-users" element={<RegisteredUsers />} />
           </Route>
         </Routes>
       </AuthProvider>
