@@ -21,7 +21,9 @@ import PrintIcon from "@mui/icons-material/Print";
 import { green } from "@mui/material/colors";
 import CloseIcon from "@mui/icons-material/Close";
 import IconButton from "@mui/material/IconButton";
+import API_CONFIG from "../API/Api";
 
+const { apiKey,sandBoxTestToken } = API_CONFIG;
 export default function BasicTable() {
   const [invoices, setInvoices] = useState([]);
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -32,7 +34,6 @@ export default function BasicTable() {
   const getMyInvoices = async () => {
     setLoading(true);
     try {
-      const sandBoxTestToken = localStorage.getItem("sandBoxTestToken");
       const res = await axios.get("http://45.55.137.96:5150/get-invoice-data", {
         headers: {
           Authorization: `Bearer ${sandBoxTestToken}`,

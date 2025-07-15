@@ -2,7 +2,7 @@ import axios from "axios";
 import API_CONFIG from "./Api";
 import Swal from "sweetalert2";
 
-const { apiKey } = API_CONFIG;
+const { apiKey,sandBoxTestToken } = API_CONFIG;
 
 // export const postData = async (endpoint, data) => {
 //   const token = localStorage.getItem("token");
@@ -37,7 +37,6 @@ const { apiKey } = API_CONFIG;
 //   }
 // };
 export const postData = async (endpoint, data) => {
-  const sandBoxTestToken = localStorage.getItem("sandBoxTestToken");
  
 
   const config = {
@@ -76,11 +75,6 @@ export const postData = async (endpoint, data) => {
 };
 
 export const fetchData = async (endpoint) => {
-  const sandBoxTestToken = localStorage.getItem("sandBoxTestToken");
-  console.log("Token:", sandBoxTestToken);
-  // if (!token) {
-  //   throw new Error("No authentication token found");
-  // }
 
   const config = {
     headers: {

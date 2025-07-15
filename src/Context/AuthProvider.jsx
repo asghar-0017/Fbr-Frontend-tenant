@@ -23,17 +23,11 @@ export const AuthProvider = ({ children }) => {
 
       setIsAuthenticated(true);
       console.log("TOKENNNNNNNN", response?.data?.data?.token);
-      console.log(
-        "SANDBOXXXXX TOKENNNNNNNN",
-        response?.data?.data?.user?.sandBoxTestToken
-      );
+     
 
       console.log("awfeagrsgsygshgserhsh", response);
       localStorage.setItem("token", response?.data?.data?.token);
-      localStorage.setItem(
-        "sandBoxTestToken",
-        response?.data?.data?.user?.sandBoxTestToken
-      );
+    
 
       navigate("/");
     } catch (err) {

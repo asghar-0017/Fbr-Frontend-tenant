@@ -28,7 +28,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import API_CONFIG from "../API/Api";
 
-const { apiKeyLocal } = API_CONFIG;
+const { apiKeyLocal,sandBoxTestToken } = API_CONFIG;
 
 export default function CreateInvoice() {
   const [formData, setFormData] = React.useState({
@@ -98,7 +98,7 @@ export default function CreateInvoice() {
       }),
       fetch("https://gw.fbr.gov.pk/pdi/v1/itemdesccode", {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("sandBoxTestToken")}`,
+          Authorization: `Bearer ${sandBoxTestToken}`,
         },
       })
         .then((response) => (response.ok ? response.json() : Promise.reject()))
@@ -126,8 +126,7 @@ export default function CreateInvoice() {
     fetch(`${apiKeyLocal}/get-buyers`, {
       headers: {
         "Content-Type": "application/json",
-        Authorization:
-          "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFkbWluQGZici5jb20iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NTI1NjQyODMsImV4cCI6MTc1MjYwMDI4M30.dIVNuwse_PcrdESMPFfuzvPx8x8RtX0Fbl0ggFW1EMc",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
     })
       .then((res) => res.json())
