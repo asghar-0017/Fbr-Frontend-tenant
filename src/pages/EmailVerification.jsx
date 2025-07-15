@@ -9,30 +9,34 @@ import {
   Avatar,
 } from "@mui/material";
 import LockIcon from "@mui/icons-material/Lock";
-import { useAuth } from "../Context/AuthProvider";
+import { Email } from "@mui/icons-material";
+import axios from "axios";
 
-const Login = ({ onLogin }) => {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+const EmailVerification = () => {
+  const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { isAuthenticated, login } = useAuth();
 
   const navigate = useNavigate();
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate("/");
-    }
-  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await login(username, password);
+      const response = await axios
+        .post("http://localhost:5150/forget-password", { email })
+        .then((res) => {
+          navigate("/otp");
+          localStorage.setItem("email", email);
+          console.log(res);
+        })
+        .catch((err) => {
+          console.error(err);
+        });
     } catch (error) {
-      setError(`Login failed. ${error.message || "Please try again."}`);
+      setError(
+        `Email verification failed. ${error.message || "Please try again."}`
+      );
       console.error(error);
     } finally {
       setLoading(false);
@@ -62,7 +66,7 @@ const Login = ({ onLogin }) => {
           <LockIcon />
         </Avatar>
         <Typography variant="h5" gutterBottom>
-          Admin Login
+          Email Verification
         </Typography>
         <form onSubmit={handleSubmit}>
           <TextField
@@ -70,18 +74,8 @@ const Login = ({ onLogin }) => {
             variant="outlined"
             fullWidth
             margin="normal"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-          <TextField
-            label="Password"
-            type="password"
-            variant="outlined"
-            fullWidth
-            margin="normal"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required
           />
           {error && (
@@ -95,25 +89,12 @@ const Login = ({ onLogin }) => {
             fullWidth
             sx={{ mt: 2, backgroundColor: "#2193b0" }}
           >
-            {loading ? "Logging in..." : "Login"}
+            {loading ? "Sending..." : "Send Email"}
           </Button>
-          <Box sx={{ display: "flex", justifyContent: "center", mt: 1 }}>
-            <Button
-              onClick={() => navigate("/forgot-password")}
-              style={{
-                color: "#62CBE4", // MUI primary color
-                textDecoration: "none",
-                fontSize: "0.85rem",
-                fontWeight: "bold",
-              }}
-            >
-              Forgot Password?
-            </Button>
-          </Box>
         </form>
       </Paper>
     </Box>
   );
 };
 
-export default Login;
+export default EmailVerification;

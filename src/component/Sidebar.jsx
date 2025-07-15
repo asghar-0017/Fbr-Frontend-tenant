@@ -19,7 +19,7 @@ import ListItemText from "@mui/material/ListItemText";
 import InboxIcon from "@mui/icons-material/MoveToInbox";
 import MailIcon from "@mui/icons-material/Mail";
 import CreateInvoice from "../pages/createInvoiceForm";
-import { href, NavLink, Route, Routes } from "react-router-dom";
+import { href, NavLink, Outlet, Route, Routes } from "react-router-dom";
 import YourInvoices from "../pages/YourInvoices";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { Button } from "@mui/material";
@@ -28,7 +28,7 @@ const navItems = [
   { name: "Invoice form", href: "/" },
   { name: "Your Invoices", href: "/your-invoices" },
   { name: "Create invoices", href: "#" },
-  {name: "logout"}
+  { name: "logout" },
 ];
 
 const drawerWidth = 240;
@@ -126,7 +126,6 @@ export default function Sidebar({ onLogout }) {
           <Typography variant="h6" noWrap component="div">
             FBR Invoices
           </Typography>
-      
         </Toolbar>
       </AppBar>
       <Drawer
@@ -152,47 +151,44 @@ export default function Sidebar({ onLogout }) {
           </IconButton>
         </DrawerHeader>
         <Divider />
-       <List>
-  {navItems.map((item, index) => {
-    const isLogout = item.name.toLowerCase() === "logout";
+        <List>
+          {navItems.map((item, index) => {
+            const isLogout = item.name.toLowerCase() === "logout";
 
-    return isLogout ? (
-      <ListItem key={item.name} disablePadding onClick={onLogout}>
-        <ListItemButton>
-          <ListItemIcon>
-            <LogoutIcon />
-          </ListItemIcon>
-          <ListItemText primary="Logout" />
-        </ListItemButton>
-      </ListItem>
-    ) : (
-      <NavLink
-        key={item.name}
-        to={item.href}
-        style={{ textDecoration: "none", color: "inherit" }}
-      >
-        <ListItem disablePadding>
-          <ListItemButton>
-            <ListItemIcon>
-              {index % 2 === 0 ? <InboxIcon /> : <MailIcon />}
-            </ListItemIcon>
-            <ListItemText primary={item.name} />
-          </ListItemButton>
-        </ListItem>
-      </NavLink>
-    );
-  })}
-</List>
+            return isLogout ? (
+              <ListItem key={item.name} disablePadding onClick={onLogout}>
+                <ListItemButton>
+                  <ListItemIcon>
+                    <LogoutIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="Logout" />
+                </ListItemButton>
+              </ListItem>
+            ) : (
+              <NavLink
+                key={item.name}
+                to={item.href}
+                style={{ textDecoration: "none", color: "inherit" }}
+              >
+                <ListItem disablePadding>
+                  <ListItemButton>
+                    <ListItemIcon>
+                      {index % 2 === 0 ? <InboxIcon /> : <MailIcon />}
+                    </ListItemIcon>
+                    <ListItemText primary={item.name} />
+                  </ListItemButton>
+                </ListItem>
+              </NavLink>
+            );
+          })}
+        </List>
 
         <Divider />
       </Drawer>
-      
+
       <Main open={open}>
         <DrawerHeader />
-        <Routes>
-          <Route path="/" element={<CreateInvoice />} />
-          <Route path="/your-invoices" element={<YourInvoices />} />
-        </Routes>
+        <Outlet />
       </Main>
     </Box>
   );

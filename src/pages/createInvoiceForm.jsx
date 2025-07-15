@@ -76,18 +76,6 @@ export default function CreateInvoice() {
   const navigate = useNavigate();
   const [allLoading, setAllLoading] = React.useState(true);
 
-  React.useEffect(() => {
-    const handleBeforeUnload = () => {
-      localStorage.clear();
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, []);
-
   const handleChange = (name, value) => {
     setFormData((prev) => ({
       ...prev,

@@ -10,30 +10,50 @@ import {
 } from "@mui/material";
 import LockIcon from "@mui/icons-material/Lock";
 import { useAuth } from "../Context/AuthProvider";
+import axios from "axios";
 
-const Login = ({ onLogin }) => {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+const ResetPassword = () => {
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { isAuthenticated, login } = useAuth();
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate("/");
-    }
-  }, [isAuthenticated, navigate]);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
     setLoading(true);
+
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match!");
+      setLoading(false);
+      return;
+    }
+
+    const email = localStorage.getItem("email");
+    console.log("Email in localStorage:", email);
+
+    if (!email) {
+      setError("Email not found. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    console.log("Sending reset request with:", { email, newPassword });
+
     try {
-      const response = await login(username, password);
+      const response = await axios.put("http://localhost:5150/reset-password", {
+        email,
+        newPassword,
+      });
+
+      console.log("Reset response:", response);
+      // Optionally navigate
+      navigate("/login");
     } catch (error) {
-      setError(`Login failed. ${error.message || "Please try again."}`);
-      console.error(error);
+      console.error("Reset error:", error);
+      setError(`Reset failed. ${error.message || "Please try again."}`);
     } finally {
       setLoading(false);
     }
@@ -62,26 +82,27 @@ const Login = ({ onLogin }) => {
           <LockIcon />
         </Avatar>
         <Typography variant="h5" gutterBottom>
-          Admin Login
+          Reset Password
         </Typography>
         <form onSubmit={handleSubmit}>
           <TextField
-            label="Email"
+            label="New Password"
             variant="outlined"
+            type="password"
             fullWidth
             margin="normal"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
             required
           />
           <TextField
-            label="Password"
+            label="Confirm Password"
             type="password"
             variant="outlined"
             fullWidth
             margin="normal"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
             required
           />
           {error && (
@@ -95,25 +116,12 @@ const Login = ({ onLogin }) => {
             fullWidth
             sx={{ mt: 2, backgroundColor: "#2193b0" }}
           >
-            {loading ? "Logging in..." : "Login"}
+            {loading ? "Resetting..." : "Reset Password"}
           </Button>
-          <Box sx={{ display: "flex", justifyContent: "center", mt: 1 }}>
-            <Button
-              onClick={() => navigate("/forgot-password")}
-              style={{
-                color: "#62CBE4", // MUI primary color
-                textDecoration: "none",
-                fontSize: "0.85rem",
-                fontWeight: "bold",
-              }}
-            >
-              Forgot Password?
-            </Button>
-          </Box>
         </form>
       </Paper>
     </Box>
   );
 };
 
-export default Login;
+export default ResetPassword;
