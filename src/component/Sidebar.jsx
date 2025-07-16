@@ -127,6 +127,10 @@ export default function Sidebar({ onLogout }) {
           <Typography variant="h6" noWrap component="div">
             FBR Invoices
           </Typography>
+          <Box sx={{ flexGrow: 1 }} />
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <img src={'/images/innovative.png'} alt="Logo" style={{ maxHeight: 40, marginLeft: 16 }} />
+          </Box>
         </Toolbar>
       </AppBar>
       <Drawer

@@ -33,18 +33,26 @@ const SROItem = ({ index, item, handleItemChange, SROId, disabled }) => {
     return null;
   }
 
+  // Determine the value to show: if data exists and matches, select it; otherwise, show 'N/A' if no SRO items
+  let selectedValue = '';
+  if (sro.length === 0) {
+    selectedValue = 'N/A';
+  } else if (item.sroItemSerialNo && sro.some(curElem => curElem.srO_ITEM_DESC === item.sroItemSerialNo)) {
+    selectedValue = item.sroItemSerialNo;
+  }
+
   return (
     <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
       <FormControl fullWidth disabled={disabled}>
         <InputLabel id={`sro-item-${index}`}>SRO Item No</InputLabel>
         <Select
           labelId={`sro-item-${index}`}
-          value={item.sroItemSerialNo || ""}
+          value={selectedValue}
           label="SRO Item No"
           onChange={handleSROChange}
         >
           {sro.length === 0 ? (
-            <MenuItem key="N/A" value="">
+            <MenuItem key="N/A" value="N/A">
               N/A
             </MenuItem>
           ) : (

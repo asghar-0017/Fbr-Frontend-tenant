@@ -58,12 +58,15 @@ const Login = ({ onLogin }) => {
           borderRadius: 3,
         }}
       >
-        <Avatar sx={{ bgcolor: "#2193b0", margin: "0 auto 10px" }}>
-          <LockIcon />
-        </Avatar>
-        <Typography variant="h5" gutterBottom>
-          Admin Login
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+          <img src={'/images/innovative.png'} alt="Logo" style={{ maxWidth: 90, maxHeight: 90, borderRadius: 8 }} />
+        </Box>
+        {/* <Avatar sx={{ bgcolor: "#2193b0", margin: "0 auto 10px" }}>
+          {/* <LockIcon /> */}
+        {/* </Avatar>  */}
+        {/* <Typography variant="h5" gutterBottom>
+          User Login
+        </Typography> */}
         <form onSubmit={handleSubmit}>
           <TextField
             label="Email"

@@ -34,7 +34,7 @@ export default function CreateInvoice() {
   const [formData, setFormData] = React.useState({
     invoiceType: "",
     invoiceDate: dayjs(),
-    sellerNTNCNIC: "6386420",
+    sellerNTNCNIC: "4136940-8",
     sellerBusinessName: "Asghar Ali",
     sellerProvince: "SINDH",
     sellerAddress: "Innovative Solutions, Karachi",
@@ -54,7 +54,7 @@ export default function CreateInvoice() {
         quantity: 1,
         totalValues: 0,
         valueSalesExcludingST: 0,
-        fixedNotifiedValueOrRetailPrice: 0,
+        fixedNotifiedValueOrRetailPrice: 1,
         salesTaxApplicable: 0,
         salesTaxWithheldAtSource: 0,
         sroScheduleNo: "",
@@ -261,7 +261,7 @@ export default function CreateInvoice() {
           quantity: 1,
           totalValues: 0,
           valueSalesExcludingST: 0,
-          fixedNotifiedValueOrRetailPrice: 0,
+          fixedNotifiedValueOrRetailPrice: 1,
           salesTaxApplicable: 0,
           salesTaxWithheldAtSource: 0,
           sroScheduleNo: "",
@@ -554,29 +554,57 @@ export default function CreateInvoice() {
   };
 
   return (
-    <Box sx={{ p: 3, backgroundColor: "#f0f2f5", borderRadius: 2, mt: 8 }}>
+    <Box
+      sx={{
+        p: { xs: 2, sm: 4 },
+        background: "linear-gradient(135deg, #f8fafc 0%, #e0e7ef 100%)",
+        borderRadius: 4,
+        mt: 8,
+        boxShadow: 6,
+        maxWidth: 1200,
+        mx: "auto",
+        mb: 6,
+      }}
+    >
       <Typography
-        variant="h6"
+        variant="h4"
         sx={{
-          mb: 2,
-          fontWeight: "bold",
+          mb: 3,
+          fontWeight: 900,
           textTransform: "uppercase",
-          color: "primary.main",
+          color: "#1976d2",
+          letterSpacing: 2,
+          textAlign: "center",
         }}
       >
-        Invoice
+        Invoice Creation
       </Typography>
+      {/* Invoice Type Section */}
       <Box
         sx={{
-          border: "1px solid #ddd",
-          borderRadius: 2,
-          p: 3,
+          border: "1px solid #e3e8ee",
+          borderRadius: 3,
+          p: { xs: 2, sm: 3 },
           mb: 4,
-          backgroundColor: "#ffffff",
+          background: "#fff",
           boxShadow: 2,
+          transition: "box-shadow 0.2s",
+          '&:hover': { boxShadow: 6 },
         }}
       >
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+        <Typography
+          variant="h6"
+          sx={{
+            mb: 2,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            color: "#1976d2",
+            letterSpacing: 1,
+          }}
+        >
+          Invoice Details
+        </Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
           <Box sx={{ m: 1, flex: "1 1 30%", minWidth: "250px" }}>
             <FormControl fullWidth>
               <InputLabel id="invoice-type-label">Invoice Type</InputLabel>
@@ -620,29 +648,32 @@ export default function CreateInvoice() {
           </Box>
         </Box>
       </Box>
-
+      {/* Seller Detail Section */}
       <Typography
         variant="h6"
         sx={{
           mb: 2,
-          fontWeight: "bold",
+          fontWeight: 700,
           textTransform: "uppercase",
-          color: "primary.main",
+          color: "#1976d2",
+          letterSpacing: 1,
         }}
       >
         Seller Detail
       </Typography>
       <Box
         sx={{
-          border: "1px solid #ddd",
-          borderRadius: 2,
-          p: 3,
+          border: "1px solid #e3e8ee",
+          borderRadius: 3,
+          p: { xs: 2, sm: 3 },
           mb: 4,
-          backgroundColor: "#ffffff",
-          boxShadow: 2,
+          background: "#f7fafd",
+          boxShadow: 1,
+          transition: "box-shadow 0.2s",
+          '&:hover': { boxShadow: 4 },
         }}
       >
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
           {[
             { label: "Seller NTN/CNIC", field: "sellerNTNCNIC" },
             { label: "Seller Business Name", field: "sellerBusinessName" },
@@ -685,29 +716,32 @@ export default function CreateInvoice() {
           </Box>
         </Box>
       </Box>
-
+      {/* Buyer Detail Section */}
       <Typography
         variant="h6"
         sx={{
           mb: 2,
-          fontWeight: "bold",
+          fontWeight: 700,
           textTransform: "uppercase",
-          color: "primary.main",
+          color: "#1976d2",
+          letterSpacing: 1,
         }}
       >
         Buyer Detail
       </Typography>
       <Box
         sx={{
-          border: "1px solid #ddd",
-          borderRadius: 2,
-          p: 3,
+          border: "1px solid #e3e8ee",
+          borderRadius: 3,
+          p: { xs: 2, sm: 3 },
           mb: 4,
-          backgroundColor: "#ffffff",
-          boxShadow: 2,
+          background: "#fff",
+          boxShadow: 1,
+          transition: "box-shadow 0.2s",
+          '&:hover': { boxShadow: 4 },
         }}
       >
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
           {/* Buyer Autocomplete Only */}
           <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
             <Autocomplete
@@ -729,29 +763,32 @@ export default function CreateInvoice() {
           </Box>
         </Box>
       </Box>
-
+      {/* Scenario Section */}
       <Typography
         variant="h6"
         sx={{
           mb: 2,
-          fontWeight: "bold",
+          fontWeight: 700,
           textTransform: "uppercase",
-          color: "primary.main",
+          color: "#1976d2",
+          letterSpacing: 1,
         }}
       >
         Scenario
       </Typography>
       <Box
         sx={{
-          border: "1px solid #ddd",
-          borderRadius: 2,
-          p: 3,
+          border: "1px solid #e3e8ee",
+          borderRadius: 3,
+          p: { xs: 2, sm: 3 },
           mb: 4,
-          backgroundColor: "#ffffff",
-          boxShadow: 2,
+          background: "#f7fafd",
+          boxShadow: 1,
+          transition: "box-shadow 0.2s",
+          '&:hover': { boxShadow: 4 },
         }}
       >
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
           <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
             <FormControl fullWidth>
               <InputLabel id="scenarioId">Scenario</InputLabel>
@@ -784,14 +821,15 @@ export default function CreateInvoice() {
           </Typography>
         )}
       </Box>
-
+      {/* Items Section */}
       <Typography
         variant="h6"
         sx={{
           mb: 2,
-          fontWeight: "bold",
+          fontWeight: 700,
           textTransform: "uppercase",
-          color: "primary.main",
+          color: "#1976d2",
+          letterSpacing: 1,
         }}
       >
         Items
@@ -801,13 +839,15 @@ export default function CreateInvoice() {
           key={index}
           sx={{
             mb: 4,
-            border: "1px solid #ccc",
-            borderRadius: 2,
-            p: 2,
-            boxShadow: 1,
-            backgroundColor: "#fafafa",
+            border: "1px solid #e3e8ee",
+            borderRadius: 3,
+            p: { xs: 2, sm: 3 },
+            boxShadow: 2,
+            background: "#fff",
             position: "relative",
             minHeight: "200px",
+            transition: "box-shadow 0.2s, border-color 0.2s",
+            '&:hover': { boxShadow: 6, borderColor: '#1976d2' },
           }}
         >
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 2 }}>
@@ -882,7 +922,22 @@ export default function CreateInvoice() {
               <TextField
                 fullWidth
                 label="Product Description"
-                value={item.productDescription}
+                value={item.productDescription || ""}
+                InputProps={{
+                  readOnly: true,
+                }}
+                variant="outlined"
+              />
+            </Box>
+            <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
+              <TextField
+                fullWidth
+                label="Sales Type"
+                type="text"
+                value={item.saleType || ""}
+                onChange={(e) =>
+                  handleItemChange(index, "saleType", e.target.value)
+                }
                 InputProps={{
                   readOnly: true,
                 }}
@@ -1040,47 +1095,44 @@ export default function CreateInvoice() {
             </Box>
           </Box>
 
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mt: 2 }}>
-            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
-              <TextField
-                fullWidth
-                label="Sales Type"
-                type="text"
-                value={localStorage.getItem("saleType") || ""}
-                onChange={(e) =>
-                  handleItemChange(index, "saleType", e.target.value)
-                }
-                InputProps={{
-                  readOnly: true,
-                }}
-                variant="outlined"
-              />
-            </Box>
-          </Box>
-
           <Box sx={{ position: "relative", mt: 2, textAlign: "right" }}>
             <Button
               variant="contained"
               color="error"
               onClick={() => removeItem(index)}
-              sx={{ mt: 2 }}
+              sx={{ mt: 2, borderRadius: 2, fontWeight: 600, px: 3, boxShadow: 1, transition: 'background 0.2s', '&:hover': { background: '#b71c1c' } }}
             >
               Remove Item
             </Button>
           </Box>
         </Box>
       ))}
-
       <Box sx={{ display: "flex", justifyContent: "space-between", mt: 4 }}>
-        <Button variant="contained" onClick={addNewItem} color="success">
-          Add New Item
+        <Button
+          variant="contained"
+          onClick={addNewItem}
+          color="success"
+          sx={{ borderRadius: 2, fontWeight: 700, px: 4, py: 1.5, boxShadow: 2, fontSize: 18, letterSpacing: 1, transition: 'background 0.2s', '&:hover': { background: '#388e3c' } }}
+        >
+          + Add New Item
         </Button>
         <Box>
           <Button
             onClick={handleSubmitChange}
             variant="contained"
             color="primary"
-            sx={{ mr: 2 }}
+            sx={{
+              mr: 2,
+              borderRadius: 2,
+              fontWeight: 700,
+              px: 4,
+              py: 1.5,
+              fontSize: 18,
+              letterSpacing: 1,
+              boxShadow: 2,
+              transition: 'background 0.2s',
+              '&:hover': { background: '#115293' },
+            }}
             disabled={loading}
           >
             {loading ? (
