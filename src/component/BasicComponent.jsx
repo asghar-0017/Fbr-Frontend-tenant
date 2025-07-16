@@ -15,6 +15,9 @@ import {
   Divider,
   useTheme,
   CircularProgress,
+  TextField,
+  MenuItem,
+  InputAdornment,
 } from "@mui/material";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import PrintIcon from "@mui/icons-material/Print";
@@ -22,6 +25,7 @@ import { green } from "@mui/material/colors";
 import CloseIcon from "@mui/icons-material/Close";
 import IconButton from "@mui/material/IconButton";
 import API_CONFIG from "../API/Api";
+import SearchIcon from '@mui/icons-material/Search';
 
 const { apiKey,sandBoxTestToken } = API_CONFIG;
 export default function BasicTable() {
@@ -29,6 +33,8 @@ export default function BasicTable() {
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [search, setSearch] = useState("");
+  const [saleType, setSaleType] = useState("All");
   const theme = useTheme();
 
   const getMyInvoices = async () => {
@@ -76,6 +82,17 @@ export default function BasicTable() {
   // Sort invoices so the last one (newest) appears first
   const sortedInvoices = [...invoices].reverse();
 
+  // Filtered invoices
+  const filteredInvoices = [...invoices].filter((row) => {
+    // Sale type filter
+    const saleTypeMatch = saleType === "All" || (row.invoiceType || "").toLowerCase().includes(saleType.toLowerCase());
+    // Search filter (invoice number or buyer NTN)
+    const searchLower = search.trim().toLowerCase();
+    const invoiceNumberMatch = (row.invoiceNumber || "").toString().toLowerCase().includes(searchLower);
+    const buyerNTNMatch = (row.buyerNTNCNIC || "").toString().toLowerCase().includes(searchLower);
+    return saleTypeMatch && (invoiceNumberMatch || buyerNTNMatch);
+  }).reverse();
+
   return (
     <>
       {loading ? (
@@ -104,6 +121,36 @@ export default function BasicTable() {
           >
             Invoice List
           </Typography>
+          {/* Search and Filter Controls */}
+          <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+            <TextField
+              variant="outlined"
+              size="small"
+              placeholder="Search by Invoice # or Buyer NTN"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ minWidth: 260 }}
+            />
+            <TextField
+              select
+              label="Sale Type"
+              size="small"
+              value={saleType}
+              onChange={e => setSaleType(e.target.value)}
+              sx={{ minWidth: 160 }}
+            >
+              <MenuItem value="All">All</MenuItem>
+              <MenuItem value="Sale Invoice">Sale Invoice</MenuItem>
+              <MenuItem value="Debit Note">Debit Note</MenuItem>
+            </TextField>
+          </Box>
 
           <TableContainer
             component={Paper}
@@ -142,7 +189,7 @@ export default function BasicTable() {
               </TableHead>
 
               <TableBody>
-                {sortedInvoices.map((row, index) => (
+                {filteredInvoices.map((row, index) => (
                   <TableRow
                     key={row._id || index}
                     sx={{
