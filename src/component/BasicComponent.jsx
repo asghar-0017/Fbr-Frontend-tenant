@@ -26,6 +26,9 @@ import CloseIcon from "@mui/icons-material/Close";
 import IconButton from "@mui/material/IconButton";
 import API_CONFIG from "../API/Api";
 import SearchIcon from '@mui/icons-material/Search';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import SentimentDissatisfiedIcon from '@mui/icons-material/SentimentDissatisfied';
+import Tooltip from '@mui/material/Tooltip';
 
 const { apiKey,sandBoxTestToken } = API_CONFIG;
 export default function BasicTable() {
@@ -110,17 +113,33 @@ export default function BasicTable() {
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ p: 2 }}>
-          <Typography
-            variant="h6"
+        <Box sx={{ p: { xs: 1, sm: 3 }, maxWidth: 1200, mx: "auto" }}>
+          {/* Header Section */}
+          <Box
             sx={{
-              mb: 2,
-              fontWeight: "bold",
-              color: (theme) => theme.palette.primary.main,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              mb: 3,
+              p: 2,
+              borderRadius: 3,
+              background: 'linear-gradient(90deg, #e3f2fd 0%, #f8fafc 100%)',
+              boxShadow: 2,
             }}
           >
-            Invoice List
-          </Typography>
+            <ReceiptLongIcon sx={{ fontSize: 40, color: '#1976d2' }} />
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 900,
+                color: '#1976d2',
+                letterSpacing: 1,
+                textShadow: '0 2px 8px #e3e3e3',
+              }}
+            >
+              Your Invoices
+            </Typography>
+          </Box>
           {/* Search and Filter Controls */}
           <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
             <TextField
@@ -152,129 +171,145 @@ export default function BasicTable() {
             </TextField>
           </Box>
 
-          <TableContainer
-            component={Paper}
-            elevation={3}
-            sx={{
-              borderRadius: 2,
-              overflow: "hidden",
-            }}
-          >
-            <Table sx={{ minWidth: 650 }} aria-label="invoice table">
-              <TableHead>
-                <TableRow
-                  sx={(theme) => ({
-                    backgroundColor: theme.palette.primary.main,
-                  })}
-                >
-                  {[
-                    "Invoice Number",
-                    "Invoice Type",
-                    "Scenario ID",
-                    "HS Code",
-                    "Actions",
-                  ].map((heading) => (
-                    <TableCell
-                      key={heading}
-                      align={heading === "Invoice Number" ? "left" : "right"}
-                      sx={(theme) => ({
-                        color: theme.palette.primary.contrastText,
-                        fontWeight: "bold",
-                      })}
-                    >
-                      {heading}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-
-              <TableBody>
-                {filteredInvoices.map((row, index) => (
+          {/* Empty State */}
+          {filteredInvoices.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 8, color: '#90a4ae' }}>
+              <SentimentDissatisfiedIcon sx={{ fontSize: 60, mb: 2 }} />
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                No invoices found
+              </Typography>
+              <Typography variant="body2">
+                Try adjusting your search or filter criteria.
+              </Typography>
+            </Box>
+          ) : (
+            <TableContainer
+              component={Paper}
+              elevation={4}
+              sx={{
+                borderRadius: 3,
+                overflow: "hidden",
+                boxShadow: 4,
+              }}
+            >
+              <Table sx={{ minWidth: 650 }} aria-label="invoice table">
+                <TableHead>
                   <TableRow
-                    key={row._id || index}
                     sx={{
-                      "&:nth-of-type(odd)": (theme) => ({
-                        backgroundColor: theme.palette.action.hover,
-                      }),
-                      "&:hover": (theme) => ({
-                        backgroundColor: theme.palette.action.selected,
-                      }),
-                      transition: "background-color 0.3s",
+                      background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 100%)',
                     }}
                   >
-                    <TableCell component="th" scope="row">
-                      {row.invoiceNumber}
-                    </TableCell>
-                    <TableCell align="right">
-                      {row.invoiceType || "N/A"}
-                    </TableCell>
-                    <TableCell align="right">
-                      {row.scenarioId || "N/A"}
-                    </TableCell>
-                    <TableCell align="right">
-                      {row.items.map((item) => item.hsCode).join(", ") || "N/A"}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Box
+                    {[
+                      "Invoice Number",
+                      "Invoice Type",
+                      "Scenario ID",
+                      "HS Code",
+                      "Actions",
+                    ].map((heading) => (
+                      <TableCell
+                        key={heading}
+                        align={heading === "Invoice Number" ? "left" : "right"}
                         sx={{
-                          display: "flex",
-                          justifyContent: "flex-end",
-                          gap: 1,
+                          color: '#fff',
+                          fontWeight: "bold",
+                          fontSize: 16,
+                          letterSpacing: 0.5,
                         }}
                       >
-                        <Button
-                          onClick={() => handleButtonClick(row.invoiceNumber)}
-                          variant="outlined"
-                          size="small"
-                          startIcon={<PrintIcon />}
-                          sx={(theme) => ({
-                            cursor: "pointer",
-                            textTransform: "none",
-                            borderRadius: 2,
-                            color: green[700],
-                            borderColor: green[700],
-                            fontSize: "0.75rem",
-                            padding: "4px 10px",
-                            "&:hover": {
-                              backgroundColor: green[700],
-                              color: "white",
-                              borderColor: green[700],
-                            },
-                          })}
-                        >
-                          Print
-                        </Button>
-                        <Button
-                          onClick={() => handleViewInvoice(row.invoiceNumber)}
-                          variant="outlined"
-                          size="small"
-                          startIcon={<VisibilityIcon />}
-                          sx={(theme) => ({
-                            cursor: "pointer",
-                            textTransform: "none",
-                            borderRadius: 2,
-                            color: theme.palette.primary.main,
-                            borderColor: theme.palette.primary.main,
-                            fontSize: "0.75rem",
-                            padding: "4px 10px",
-                            "&:hover": {
-                              backgroundColor: theme.palette.primary.main,
-                              color: "white",
-                              borderColor: theme.palette.primary.main,
-                            },
-                          })}
-                        >
-                          View
-                        </Button>
-                      </Box>
-                    </TableCell>
+                        {heading}
+                      </TableCell>
+                    ))}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                </TableHead>
 
-          {/* ================= Modal ================= */}
+                <TableBody>
+                  {filteredInvoices.map((row, index) => (
+                    <TableRow
+                      key={row._id || index}
+                      sx={{
+                        backgroundColor: index % 2 === 0 ? '#f5fafd' : '#e3f2fd',
+                        '&:hover': {
+                          backgroundColor: '#bbdefb',
+                          transition: 'background-color 0.3s',
+                        },
+                      }}
+                    >
+                      <TableCell component="th" scope="row" sx={{ fontWeight: 700, color: '#1976d2', fontSize: 15 }}>
+                        {row.invoiceNumber}
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 500 }}>
+                        {row.invoiceType || "N/A"}
+                      </TableCell>
+                      <TableCell align="right">
+                        {row.scenarioId || "N/A"}
+                      </TableCell>
+                      <TableCell align="right">
+                        {row.items.map((item) => item.hsCode).join(", ") || "N/A"}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
+                          <Tooltip title="Print Invoice">
+                            <Button
+                              onClick={() => handleButtonClick(row.invoiceNumber)}
+                              variant="outlined"
+                              size="small"
+                              startIcon={<PrintIcon />}
+                              sx={{
+                                cursor: "pointer",
+                                textTransform: "none",
+                                borderRadius: 2,
+                                color: green[700],
+                                borderColor: green[700],
+                                fontSize: "0.85rem",
+                                px: 2,
+                                py: 0.5,
+                                boxShadow: 1,
+                                '&:hover': {
+                                  backgroundColor: green[700],
+                                  color: "white",
+                                  borderColor: green[700],
+                                },
+                              }}
+                            >
+                              Print
+                            </Button>
+                          </Tooltip>
+                          <Tooltip title="View Invoice Details">
+                            <Button
+                              onClick={() => handleViewInvoice(row.invoiceNumber)}
+                              variant="outlined"
+                              size="small"
+                              startIcon={<VisibilityIcon />}
+                              sx={{
+                                cursor: "pointer",
+                                textTransform: "none",
+                                borderRadius: 2,
+                                color: '#1976d2',
+                                borderColor: '#1976d2',
+                                fontSize: "0.85rem",
+                                px: 2,
+                                py: 0.5,
+                                boxShadow: 1,
+                                '&:hover': {
+                                  backgroundColor: '#1976d2',
+                                  color: "white",
+                                  borderColor: '#1976d2',
+                                },
+                              }}
+                            >
+                              View
+                            </Button>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+
+          {/* Invoice Details Modal (unchanged) */}
           <Modal
             open={viewModalOpen}
             onClose={() => setViewModalOpen(false)}
