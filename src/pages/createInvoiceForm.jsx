@@ -28,7 +28,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import API_CONFIG from "../API/Api";
 
-const { apiKeyLocal,sandBoxTestToken } = API_CONFIG;
+const { apiKeyLocal, sandBoxTestToken } = API_CONFIG;
 
 export default function CreateInvoice() {
   const [formData, setFormData] = React.useState({
@@ -121,7 +121,6 @@ export default function CreateInvoice() {
     ]).finally(() => setAllLoading(false));
   }, []);
 
-  // Fetch buyers list on mount
   useEffect(() => {
     fetch(`${apiKeyLocal}/get-buyers`, {
       headers: {
@@ -134,7 +133,6 @@ export default function CreateInvoice() {
       .catch(() => setBuyers([]));
   }, []);
 
-  // When buyer is selected, fill buyer fields
   useEffect(() => {
     if (!selectedBuyerId) return;
     const buyer = buyers.find((b) => b._id === selectedBuyerId);
@@ -159,11 +157,7 @@ export default function CreateInvoice() {
       const parseValue = (val, isFloat = true) =>
         val === "" ? (isFloat ? 0 : "") : isFloat ? parseFloat(val) || 0 : val;
 
-      // Always define unitCost and quantity before use
-      const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
-      const quantity = parseFloat(item.quantity || 0);
-
-      // Handle all editable fields
+      // Update the field first
       if (
         [
           "quantity",
@@ -200,31 +194,29 @@ export default function CreateInvoice() {
         item.sroItemSerialNo = "";
       }
 
-      // Calculate valueSalesExcludingST if not manually overridden
-      if (
-        !item.isValueSalesManual &&
-        (field === "quantity" || field === "fixedNotifiedValueOrRetailPrice")
-      ) {
+      // Calculate values if not manually overridden
+      if (!item.isValueSalesManual) {
+        const quantity = parseFloat(item.quantity || 0);
+        const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
         item.valueSalesExcludingST = quantity * unitCost;
+
+        let rateFraction = 0;
+        if (item.rate && item.rate.toLowerCase() !== "exempt" && item.rate !== "0%") {
+          rateFraction = parseFloat((item.rate || "0").replace("%", "")) / 100;
+          item.salesTaxApplicable = item.valueSalesExcludingST * rateFraction;
+        } else {
+          item.salesTaxApplicable = 0;
+          item.salesTaxWithheldAtSource = 0;
+        }
       }
 
-      // Parse rate as a number from percentage string
-      let rateFraction = 0;
-      if (item.rate && item.rate.toLowerCase() !== "exempt" && item.rate !== "0%") {
-        rateFraction = parseFloat((item.rate || "0").replace("%", "")) / 100;
-        item.salesTaxApplicable = Number(item.valueSalesExcludingST) * rateFraction;
-        item.salesTaxWithheldAtSource = 0; // or item.salesTaxApplicable if needed
-      } else {
-        // Exempt or 0%
-        item.salesTaxApplicable = 0;
-        item.salesTaxWithheldAtSource = 0;
-      }
-      // Always ensure numeric fields are numbers (not empty string)
+      // Ensure numeric fields are numbers
       item.extraTax = parseInt(item.extraTax, 10) || 0;
       item.furtherTax = Number(item.furtherTax) || 0;
       item.fedPayable = Number(item.fedPayable) || 0;
       item.discount = Number(item.discount) || 0;
-      // Calculate totalValues as per FBR
+
+      // Calculate totalValues
       item.totalValues =
         Number(item.valueSalesExcludingST) +
         Number(item.salesTaxApplicable) +
@@ -232,9 +224,10 @@ export default function CreateInvoice() {
         Number(item.fedPayable) +
         Number(item.extraTax) -
         Number(item.discount);
-      // Round salesTaxApplicable and totalValues to 2 decimal places
-      item.salesTaxApplicable = Number((item.salesTaxApplicable).toFixed(2));
-      item.totalValues = Number((item.totalValues).toFixed(2));
+
+      // Round for display
+      item.salesTaxApplicable = Number(item.salesTaxApplicable.toFixed(2));
+      item.totalValues = Number(item.totalValues.toFixed(2));
 
       updatedItems[index] = item;
       return { ...prev, items: updatedItems };
@@ -336,8 +329,8 @@ export default function CreateInvoice() {
             fixedNotifiedValueOrRetailPrice: unitCost,
             quantity: quantity,
             valueSalesExcludingST: isExemptScenario ? valueSalesExcludingST : 0,
-            salesTaxApplicable: isExemptScenario ? 0 : item.salesTaxApplicable,
-            totalValues: isExemptScenario ? valueSalesExcludingST : 0,
+            salesTaxApplicable: isExemptScenario ? 0 : valueSalesExcludingST * 0.18,
+            totalValues: isExemptScenario ? valueSalesExcludingST : valueSalesExcludingST + (valueSalesExcludingST * 0.18),
             salesTaxWithheldAtSource: 0,
             extraTax: "",
             furtherTax: 0,
@@ -389,14 +382,6 @@ export default function CreateInvoice() {
               index + 1
             }`,
           },
-          // {
-          //   field: "salesTaxApplicable",
-          //   message: `Sales Tax Applicable is required for item ${index + 1}`,
-          // },
-          // {
-          //   field: "saleType",
-          //   message: `Sale Type is required for item ${index + 1}`,
-          // },
           ...(item.rate && item.rate.toLowerCase() === "exempt"
             ? [
                 {
@@ -589,7 +574,7 @@ export default function CreateInvoice() {
           background: "#fff",
           boxShadow: 2,
           transition: "box-shadow 0.2s",
-          '&:hover': { boxShadow: 6 },
+          "&:hover": { boxShadow: 6 },
         }}
       >
         <Typography
@@ -670,7 +655,7 @@ export default function CreateInvoice() {
           background: "#f7fafd",
           boxShadow: 1,
           transition: "box-shadow 0.2s",
-          '&:hover': { boxShadow: 4 },
+          "&:hover": { boxShadow: 4 },
         }}
       >
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
@@ -693,9 +678,7 @@ export default function CreateInvoice() {
 
           <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
             <FormControl fullWidth>
-              <InputLabel id="seller-province-label">
-                Seller Province
-              </InputLabel>
+              <InputLabel id="seller-province-label">Seller Province</InputLabel>
               <Select
                 labelId="seller-province-label"
                 value={formData.sellerProvince}
@@ -738,11 +721,10 @@ export default function CreateInvoice() {
           background: "#fff",
           boxShadow: 1,
           transition: "box-shadow 0.2s",
-          '&:hover': { boxShadow: 4 },
+          "&:hover": { boxShadow: 4 },
         }}
       >
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-          {/* Buyer Autocomplete Only */}
           <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
             <Autocomplete
               fullWidth
@@ -753,12 +735,20 @@ export default function CreateInvoice() {
                   : ""
               }
               value={buyers.find((b) => b._id === selectedBuyerId) || null}
-              onChange={(_, newValue) => setSelectedBuyerId(newValue ? newValue._id : "")}
+              onChange={(_, newValue) =>
+                setSelectedBuyerId(newValue ? newValue._id : "")
+              }
               renderInput={(params) => (
                 <TextField {...params} label="Select Buyer" variant="outlined" />
               )}
               isOptionEqualToValue={(option, value) => option._id === value._id}
-              getOptionKey={(option) => option._id || option.buyerNTNCNIC || option.buyerBusinessName || option.buyerAddress || Math.random()}
+              getOptionKey={(option) =>
+                option._id ||
+                option.buyerNTNCNIC ||
+                option.buyerBusinessName ||
+                option.buyerAddress ||
+                Math.random()
+              }
             />
           </Box>
         </Box>
@@ -785,7 +775,7 @@ export default function CreateInvoice() {
           background: "#f7fafd",
           boxShadow: 1,
           transition: "box-shadow 0.2s",
-          '&:hover': { boxShadow: 4 },
+          "&:hover": { boxShadow: 4 },
         }}
       >
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
@@ -816,8 +806,8 @@ export default function CreateInvoice() {
             variant="body2"
             sx={{ mt: 1, ml: 2, color: "text.secondary" }}
           >
-            {scenarioData.find((s) => s.id === formData.scenarioId)
-              ?.description || ""}
+            {scenarioData.find((s) => s.id === formData.scenarioId)?.description ||
+              ""}
           </Typography>
         )}
       </Box>
@@ -847,7 +837,7 @@ export default function CreateInvoice() {
             position: "relative",
             minHeight: "200px",
             transition: "box-shadow 0.2s, border-color 0.2s",
-            '&:hover': { boxShadow: 6, borderColor: '#1976d2' },
+            "&:hover": { boxShadow: 6, borderColor: "#1976d2" },
           }}
         >
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 2 }}>
@@ -857,8 +847,7 @@ export default function CreateInvoice() {
                 options={hsCodeList}
                 getOptionLabel={(option) => option.hS_CODE}
                 value={
-                  hsCodeList.find((code) => code.hS_CODE === item.hsCode) ||
-                  null
+                  hsCodeList.find((code) => code.hS_CODE === item.hsCode) || null
                 }
                 onChange={(_, newValue) => {
                   handleItemChange(
@@ -1100,7 +1089,15 @@ export default function CreateInvoice() {
               variant="contained"
               color="error"
               onClick={() => removeItem(index)}
-              sx={{ mt: 2, borderRadius: 2, fontWeight: 600, px: 3, boxShadow: 1, transition: 'background 0.2s', '&:hover': { background: '#b71c1c' } }}
+              sx={{
+                mt: 2,
+                borderRadius: 2,
+                fontWeight: 600,
+                px: 3,
+                boxShadow: 1,
+                transition: "background 0.2s",
+                "&:hover": { background: "#b71c1c" },
+              }}
             >
               Remove Item
             </Button>
@@ -1112,7 +1109,17 @@ export default function CreateInvoice() {
           variant="contained"
           onClick={addNewItem}
           color="success"
-          sx={{ borderRadius: 2, fontWeight: 700, px: 4, py: 1.5, boxShadow: 2, fontSize: 18, letterSpacing: 1, transition: 'background 0.2s', '&:hover': { background: '#388e3c' } }}
+          sx={{
+            borderRadius: 2,
+            fontWeight: 700,
+            px: 4,
+            py: 1.5,
+            boxShadow: 2,
+            fontSize: 18,
+            letterSpacing: 1,
+            transition: "background 0.2s",
+            "&:hover": { background: "#388e3c" },
+          }}
         >
           + Add New Item
         </Button>
@@ -1130,8 +1137,8 @@ export default function CreateInvoice() {
               fontSize: 18,
               letterSpacing: 1,
               boxShadow: 2,
-              transition: 'background 0.2s',
-              '&:hover': { background: '#115293' },
+              transition: "background 0.2s",
+              "&:hover": { background: "#115293" },
             }}
             disabled={loading}
           >
