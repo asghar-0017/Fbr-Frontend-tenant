@@ -159,6 +159,10 @@ export default function CreateInvoice() {
       const parseValue = (val, isFloat = true) =>
         val === "" ? (isFloat ? 0 : "") : isFloat ? parseFloat(val) || 0 : val;
 
+      // Always define unitCost and quantity before use
+      const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
+      const quantity = parseFloat(item.quantity || 0);
+
       // Handle all editable fields
       if (
         [
@@ -196,49 +200,41 @@ export default function CreateInvoice() {
         item.sroItemSerialNo = "";
       }
 
-      // Calculate dependent fields if not manually overridden
+      // Calculate valueSalesExcludingST if not manually overridden
       if (
         !item.isValueSalesManual &&
         (field === "quantity" || field === "fixedNotifiedValueOrRetailPrice")
       ) {
-        const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
-        const quantity = parseFloat(item.quantity || 0);
-        item.valueSalesExcludingST = unitCost * quantity;
+        item.valueSalesExcludingST = quantity * unitCost;
       }
 
-      // Update tax calculations
-      if (
-        item.rate &&
-        item.rate.toLowerCase() !== "exempt" &&
-        [
-          "quantity",
-          "fixedNotifiedValueOrRetailPrice",
-          "valueSalesExcludingST",
-          "rate",
-        ].includes(field)
-      ) {
-        const rateFraction =
-          parseFloat((item.rate || "0").replace("%", "")) / 100;
-        const valueSales = parseFloat(item.valueSalesExcludingST || 0);
-        const salesTax = Math.round(valueSales * rateFraction);
-        item.salesTaxApplicable = salesTax;
-        item.totalValues = valueSales + salesTax;
-        item.salesTaxWithheldAtSource = salesTax;
-      } else if (item.rate && item.rate.toLowerCase() === "exempt") {
-        // For exempt items, calculate valueSalesExcludingST but set taxes to 0
-        const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
-        const quantity = parseFloat(item.quantity || 0);
-        item.valueSalesExcludingST = item.isValueSalesManual
-          ? parseFloat(item.valueSalesExcludingST || 0)
-          : unitCost * quantity;
+      // Parse rate as a number from percentage string
+      let rateFraction = 0;
+      if (item.rate && item.rate.toLowerCase() !== "exempt" && item.rate !== "0%") {
+        rateFraction = parseFloat((item.rate || "0").replace("%", "")) / 100;
+        item.salesTaxApplicable = Number(item.valueSalesExcludingST) * rateFraction;
+        item.salesTaxWithheldAtSource = 0; // or item.salesTaxApplicable if needed
+      } else {
+        // Exempt or 0%
         item.salesTaxApplicable = 0;
-        item.totalValues = item.valueSalesExcludingST;
         item.salesTaxWithheldAtSource = 0;
-        item.extraTax = "";
-        item.furtherTax = 0;
-        item.fedPayable = 0;
-        item.discount = 0;
       }
+      // Always ensure numeric fields are numbers (not empty string)
+      item.extraTax = parseInt(item.extraTax, 10) || 0;
+      item.furtherTax = Number(item.furtherTax) || 0;
+      item.fedPayable = Number(item.fedPayable) || 0;
+      item.discount = Number(item.discount) || 0;
+      // Calculate totalValues as per FBR
+      item.totalValues =
+        Number(item.valueSalesExcludingST) +
+        Number(item.salesTaxApplicable) +
+        Number(item.furtherTax) +
+        Number(item.fedPayable) +
+        Number(item.extraTax) -
+        Number(item.discount);
+      // Round salesTaxApplicable and totalValues to 2 decimal places
+      item.salesTaxApplicable = Number((item.salesTaxApplicable).toFixed(2));
+      item.totalValues = Number((item.totalValues).toFixed(2));
 
       updatedItems[index] = item;
       return { ...prev, items: updatedItems };
@@ -444,6 +440,14 @@ export default function CreateInvoice() {
           sroItemSerialNo: rest.sroItemSerialNo?.trim() || "",
           productDescription: rest.productDescription?.trim() || "N/A",
           saleType: rest.saleType?.trim() || "Goods at standard rate (default)",
+          extraTax: (rest.extraTax !== undefined && rest.extraTax !== null && rest.extraTax !== "" && Number(rest.extraTax) !== 0)
+            ? parseInt(rest.extraTax, 10)
+            : "",
+          furtherTax: Number(rest.furtherTax) || 0,
+          fedPayable: Number(rest.fedPayable) || 0,
+          discount: Number(rest.discount) || 0,
+          salesTaxApplicable: Number(Number(rest.salesTaxApplicable).toFixed(2)),
+          totalValues: Number(Number(rest.totalValues).toFixed(2)),
         })
       );
 
@@ -704,63 +708,23 @@ export default function CreateInvoice() {
         }}
       >
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-          {/* Buyer Dropdown */}
+          {/* Buyer Autocomplete Only */}
           <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
-            <FormControl fullWidth>
-              <InputLabel id="buyer-list-label">Select Buyer</InputLabel>
-              <Select
-                labelId="buyer-list-label"
-                value={selectedBuyerId}
-                label="Select Buyer"
-                onChange={(e) => setSelectedBuyerId(e.target.value)}
-              >
-                <MenuItem value="">
-                  <em>Choose Buyer</em>
-                </MenuItem>
-                {buyers.map((buyer) => (
-                  <MenuItem key={buyer._id} value={buyer._id}>
-                    {buyer.buyerBusinessName} ({buyer.buyerNTNCNIC})
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-          {[
-            { label: "Buyer NTN/CNIC", field: "buyerNTNCNIC" },
-            { label: "Buyer Business Name", field: "buyerBusinessName" },
-            { label: "Buyer Address", field: "buyerAddress" },
-          ].map(({ label, field }) => (
-            <Box key={field} sx={{ flex: "1 1 30%", minWidth: "250px" }}>
-              <TextField
-                disabled
-                fullWidth
-                label={label}
-                value={formData[field]}
-                onChange={(e) => handleChange(field, e.target.value)}
-                variant="outlined"
-              />
-            </Box>
-          ))}
-
-          <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
-            <TextField
+            <Autocomplete
               fullWidth
-              label="Buyer Province"
-              disabled
-              value={formData.buyerProvince}
-              variant="outlined"
-              InputProps={{ readOnly: true }}
-            />
-          </Box>
-
-          <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
-            <TextField
-              fullWidth
-              label="Buyer Registration Type"
-              value={formData.buyerRegistrationType}
-              variant="outlined"
-              disabled
-              InputProps={{ readOnly: true }}
+              options={buyers}
+              getOptionLabel={(option) =>
+                option.buyerBusinessName
+                  ? `${option.buyerBusinessName} (${option.buyerNTNCNIC})`
+                  : ""
+              }
+              value={buyers.find((b) => b._id === selectedBuyerId) || null}
+              onChange={(_, newValue) => setSelectedBuyerId(newValue ? newValue._id : "")}
+              renderInput={(params) => (
+                <TextField {...params} label="Select Buyer" variant="outlined" />
+              )}
+              isOptionEqualToValue={(option, value) => option._id === value._id}
+              getOptionKey={(option) => option._id || option.buyerNTNCNIC || option.buyerBusinessName || option.buyerAddress || Math.random()}
             />
           </Box>
         </Box>
