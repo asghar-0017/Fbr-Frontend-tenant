@@ -28,13 +28,13 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import API_CONFIG from "../API/Api";
 
-const { apiKeyLocal, sandBoxTestToken } = API_CONFIG;
+const { apiKeyLocal } = API_CONFIG;
 
-export default function CreateInvoice() {
+export default function ProductionForm() {
   const [formData, setFormData] = React.useState({
-    invoiceType: "",
+    invoiceType: "Sale Invoice",
     invoiceDate: dayjs(),
-    sellerNTNCNIC: "6386420",
+    sellerNTNCNIC: "4136940-8",
     sellerBusinessName: "Asghar Ali",
     sellerProvince: "SINDH",
     sellerAddress: "Innovative Solutions, Karachi",
@@ -42,7 +42,7 @@ export default function CreateInvoice() {
     buyerBusinessName: "",
     buyerProvince: "",
     buyerAddress: "",
-    buyerRegistrationType: "",
+    buyerRegistrationType: "Unregistered",
     invoiceRefNo: "",
     scenarioId: "",
     items: [
@@ -54,12 +54,12 @@ export default function CreateInvoice() {
         quantity: 1,
         totalValues: 0,
         valueSalesExcludingST: 0,
-        fixedNotifiedValueOrRetailPrice: 1,
+        fixedNotifiedValueOrRetailPrice: 0,
         salesTaxApplicable: 0,
         salesTaxWithheldAtSource: 0,
         sroScheduleNo: "",
         sroItemSerialNo: "",
-        saleType: "",
+        saleType: "Goods at standard rate (default)",
         isSROScheduleEnabled: false,
         isSROItemEnabled: false,
         extraTax: "",
@@ -91,14 +91,15 @@ export default function CreateInvoice() {
 
   React.useEffect(() => {
     setAllLoading(true);
+    const token = localStorage.getItem("token");
     Promise.allSettled([
-      fetchData("pdi/v1/provinces").then((response) => {
+      fetchData("pdi/v1/provinces", token).then((response) => {
         setProvince(response);
         localStorage.setItem("provinceResponse", JSON.stringify(response));
       }),
       fetch("https://gw.fbr.gov.pk/pdi/v1/itemdesccode", {
         headers: {
-          Authorization: `Bearer ${sandBoxTestToken}`,
+          Authorization: `Bearer ${token}`,
         },
       })
         .then((response) => (response.ok ? response.json() : Promise.reject()))
@@ -107,7 +108,7 @@ export default function CreateInvoice() {
         )
         .catch(() => setHsCodeList([])),
       fetch("https://gw.fbr.gov.pk/pdi/v1/doctypecode", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        headers: { Authorization: `Bearer ${token}` },
       })
         .then((response) => (response.ok ? response.json() : Promise.reject()))
         .then((data) => setInvoiceTypes(data))
@@ -117,7 +118,7 @@ export default function CreateInvoice() {
             { docTypeId: 9, docDescription: "Debit Note" },
           ])
         ),
-      fetchData("pdi/v1/transtypecode").then((res) => setScenario(res)),
+      fetchData("pdi/v1/transtypecode", token).then((res) => setScenario(res)),
     ]).finally(() => setAllLoading(false));
   }, []);
 
@@ -143,7 +144,7 @@ export default function CreateInvoice() {
         buyerBusinessName: buyer.buyerBusinessName || "",
         buyerProvince: buyer.buyerProvince || "",
         buyerAddress: buyer.buyerAddress || "",
-        buyerRegistrationType: buyer.buyerRegistrationType || "",
+        buyerRegistrationType: buyer.buyerRegistrationType || "Unregistered",
       }));
     }
   }, [selectedBuyerId, buyers]);
@@ -152,11 +153,11 @@ export default function CreateInvoice() {
     setFormData((prev) => {
       const updatedItems = [...prev.items];
       const item = { ...updatedItems[index] };
-  
+
       // Utility to parse values
       const parseValue = (val, isFloat = true) =>
         val === "" ? (isFloat ? 0 : "") : isFloat ? parseFloat(val) || 0 : val;
-  
+
       // Update the field
       if (
         [
@@ -179,88 +180,92 @@ export default function CreateInvoice() {
       } else {
         item[field] = value;
       }
-  
+
       // Handle SRO reset logic
       if (field === "rate" && value) {
-        item.isSROScheduleEnabled = true;
+        item.isSROScheduleEnabled = value.toLowerCase() === "exempt";
         item.sroScheduleNo = "";
         item.sroItemSerialNo = "";
         item.isSROItemEnabled = false;
         item.isValueSalesManual = false;
       }
-  
+
       if (field === "sroScheduleNo" && value) {
         item.isSROItemEnabled = true;
         item.sroItemSerialNo = "";
       }
-  
+
       // Begin calculations
       if (!item.isValueSalesManual) {
         const quantity = parseFloat(item.quantity || 0);
         const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
         const retailPrice = unitCost * quantity;
         const rate = parseFloat((item.rate || "0").replace("%", "")) || 0;
-  
+
         const isThirdSchedule =
           item.saleType === "3rd Schedule Goods" ||
           prev.scenarioId === "SN027" ||
           prev.scenarioId === "SN008";
-  
+
         if (isThirdSchedule) {
-          // Use regular calculation for 3rd schedule
           item.valueSalesExcludingST = retailPrice;
           let rateFraction = rate / 100;
-          item.salesTaxApplicable = Number((item.valueSalesExcludingST * rateFraction).toFixed(2));
-          item.totalValues = Number((item.valueSalesExcludingST + item.salesTaxApplicable).toFixed(2));
+          item.salesTaxApplicable = Number(
+            (item.valueSalesExcludingST * rateFraction).toFixed(2)
+          );
+          item.totalValues = Number(
+            (item.valueSalesExcludingST + item.salesTaxApplicable).toFixed(2)
+          );
         } else {
-          // Normal items
           item.valueSalesExcludingST = retailPrice;
           let rateFraction = 0;
           if (item.rate && item.rate.toLowerCase() !== "exempt" && item.rate !== "0%") {
             rateFraction = rate / 100;
-            item.salesTaxApplicable = Number((item.valueSalesExcludingST * rateFraction).toFixed(2));
+            item.salesTaxApplicable = Number(
+              (item.valueSalesExcludingST * rateFraction).toFixed(2)
+            );
           } else {
             item.salesTaxApplicable = 0;
             item.salesTaxWithheldAtSource = 0;
           }
-          item.totalValues = Number((item.valueSalesExcludingST + item.salesTaxApplicable).toFixed(2));
+          item.totalValues = Number(
+            (item.valueSalesExcludingST + item.salesTaxApplicable).toFixed(2)
+          );
         }
       }
-  
-      // Parse extra fields always as numbers
-      item.extraTax = parseInt(item.extraTax, 10) || 0;
-      item.furtherTax = Number(item.furtherTax) || 0;
-      item.fedPayable = Number(item.fedPayable) || 0;
-      item.discount = Number(item.discount) || 0;
-  
+
+      // Parse extra fields as numbers
+      item.extraTax = parseValue(item.extraTax, false);
+      item.furtherTax = parseValue(item.furtherTax);
+      item.fedPayable = parseValue(item.fedPayable);
+      item.discount = parseValue(item.discount);
+
       // Avoid overwriting 3rd Schedule totals
       const isThirdSchedule =
         item.saleType === "3rd Schedule Goods" ||
         prev.scenarioId === "SN027" ||
         prev.scenarioId === "SN008";
-  
+
       if (!isThirdSchedule) {
         item.totalValues =
           Number(item.valueSalesExcludingST) +
           Number(item.salesTaxApplicable) +
           Number(item.furtherTax) +
           Number(item.fedPayable) +
-          Number(item.extraTax) -
+          (item.extraTax !== "" ? Number(item.extraTax) : 0) -
           Number(item.discount);
-  
+
         item.totalValues = Number(item.totalValues.toFixed(2));
       }
-  
-      // Only round salesTaxApplicable if not 3rd Schedule
+
       if (!isThirdSchedule) {
         item.salesTaxApplicable = Number(item.salesTaxApplicable.toFixed(2));
       }
-  
+
       updatedItems[index] = item;
       return { ...prev, items: updatedItems };
     });
   };
-  
 
   const addNewItem = () => {
     const selectedScenario = scenarioData.find(
@@ -268,7 +273,7 @@ export default function CreateInvoice() {
     );
     const saleType = selectedScenario
       ? selectedScenario.saleType
-      : "Goods at Standard Rate (default)";
+      : "Goods at standard rate (default)";
 
     setFormData((prev) => ({
       ...prev,
@@ -276,13 +281,13 @@ export default function CreateInvoice() {
         ...prev.items,
         {
           hsCode: "",
-          productDescription: "",
+          productDescription: selectedScenario ? selectedScenario.description : "",
           rate: "",
           uoM: "",
           quantity: 1,
           totalValues: 0,
           valueSalesExcludingST: 0,
-          fixedNotifiedValueOrRetailPrice: 1,
+          fixedNotifiedValueOrRetailPrice: 0,
           salesTaxApplicable: 0,
           salesTaxWithheldAtSource: 0,
           sroScheduleNo: "",
@@ -317,10 +322,10 @@ export default function CreateInvoice() {
       }));
       localStorage.removeItem("saleType");
       localStorage.removeItem("productDescription");
+      localStorage.removeItem("transactionTypeId");
       return;
     }
 
-    // Set correct saleType and transactionTypeId in localStorage
     let saleType = selectedScenario.saleType || "";
     let transactionTypeId = null;
 
@@ -328,11 +333,10 @@ export default function CreateInvoice() {
       saleType = "Processing/Conversion of Goods";
       transactionTypeId = "25";
     } else if (id === "SN024") {
-      // If SN024 needs a special case, set it here
-      saleType = "Goods as per SRO.297(|)/2023";
+      saleType = "Goods as per SRO.297(I)/2023";
       transactionTypeId = "139";
     } else {
-      const normalize = str => str?.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      const normalize = (str) => str?.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
       const matchingApiRecord = scenario.find(
         (item) =>
           item.transactioN_DESC &&
@@ -352,7 +356,6 @@ export default function CreateInvoice() {
       localStorage.removeItem("transactionTypeId");
     }
 
-    // If no items, add a default item
     setFormData((prev) => {
       const items = prev.items.length > 0
         ? prev.items.map((item) => ({
@@ -360,28 +363,30 @@ export default function CreateInvoice() {
             productDescription: selectedScenario.description,
             saleType: saleType,
           }))
-        : [{
-            hsCode: "",
-            productDescription: selectedScenario.description,
-            rate: "",
-            uoM: "",
-            quantity: 1,
-            totalValues: 0,
-            valueSalesExcludingST: 0,
-            fixedNotifiedValueOrRetailPrice: 1,
-            salesTaxApplicable: 0,
-            salesTaxWithheldAtSource: 0,
-            sroScheduleNo: "",
-            sroItemSerialNo: "",
-            extraTax: "",
-            furtherTax: 0,
-            fedPayable: 0,
-            discount: 0,
-            saleType,
-            isSROScheduleEnabled: false,
-            isSROItemEnabled: false,
-            isValueSalesManual: false,
-          }];
+        : [
+            {
+              hsCode: "",
+              productDescription: selectedScenario.description,
+              rate: "",
+              uoM: "",
+              quantity: 1,
+              totalValues: 0,
+              valueSalesExcludingST: 0,
+              fixedNotifiedValueOrRetailPrice: 0,
+              salesTaxApplicable: 0,
+              salesTaxWithheldAtSource: 0,
+              sroScheduleNo: "",
+              sroItemSerialNo: "",
+              extraTax: "",
+              furtherTax: 0,
+              fedPayable: 0,
+              discount: 0,
+              saleType,
+              isSROScheduleEnabled: false,
+              isSROItemEnabled: false,
+              isValueSalesManual: false,
+            },
+          ];
       return {
         ...prev,
         scenarioId: id,
@@ -393,57 +398,79 @@ export default function CreateInvoice() {
   const handleSubmitChange = async () => {
     setLoading(true);
     try {
+      // Validate required fields for invoice header
+      const requiredFields = [
+        { field: "invoiceType", message: "Invoice Type is required (Error 0011)" },
+        { field: "invoiceDate", message: "Invoice Date is required (Error 0042)" },
+        { field: "sellerNTNCNIC", message: "Seller NTN/CNIC is required (Error 0108)" },
+        { field: "sellerBusinessName", message: "Seller Business Name is required" },
+        { field: "sellerProvince", message: "Seller Province is required" },
+        { field: "sellerAddress", message: "Seller Address is required" },
+        { field: "buyerBusinessName", message: "Buyer Business Name is required (Error 0160)" },
+        { field: "buyerProvince", message: "Buyer Province is required" },
+        { field: "buyerAddress", message: "Buyer Address is required" },
+        { field: "buyerRegistrationType", message: "Buyer Registration Type is required (Error 0012)" },
+      ];
+
+      for (const { field, message } of requiredFields) {
+        if (!formData[field] || formData[field] === "") {
+          Swal.fire({
+            icon: "error",
+            title: "Validation Error",
+            text: message,
+            confirmButtonColor: "#d33",
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Validate buyerNTNCNIC for registered buyers
+      if (formData.buyerRegistrationType === "Registered" && !formData.buyerNTNCNIC) {
+        Swal.fire({
+          icon: "error",
+          title: "Validation Error",
+          text: "Buyer NTN/CNIC is required for registered buyers (Error 0009)",
+          confirmButtonColor: "#d33",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Validate invoiceRefNo for Debit Note
+      if (formData.invoiceType === "Debit Note" && !formData.invoiceRefNo) {
+        Swal.fire({
+          icon: "error",
+          title: "Validation Error",
+          text: "Invoice Reference No. is required for Debit Note (Error 0026)",
+          confirmButtonColor: "#d33",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Validate items
       for (const [index, item] of formData.items.entries()) {
         const itemRequiredFields = [
-          {
-            field: "hsCode",
-            message: `HS Code is required for item ${index + 1}`,
-          },
-          {
-            field: "productDescription",
-            message: `Product Description is required for item ${index + 1}`,
-          },
-          { field: "rate", message: `Rate is required for item ${index + 1}` },
-          {
-            field: "uoM",
-            message: `Unit of Measurement is required for item ${index + 1}`,
-          },
-          {
-            field: "quantity",
-            message: `Quantity is required for item ${index + 1}`,
-          },
-          {
-            field: "valueSalesExcludingST",
-            message: `Value Sales Excluding ST is required for item ${
-              index + 1
-            }`,
-          },
-          ...(item.rate && item.rate.toLowerCase() === "exempt"
+          { field: "hsCode", message: `HS Code is required for item ${index + 1} (Error 0044)` },
+          { field: "productDescription", message: `Product Description is required for item ${index + 1}` },
+          { field: "rate", message: `Rate is required for item ${index + 1} (Error 0046)` },
+          { field: "uoM", message: `Unit of Measurement is required for item ${index + 1} (Error 0099)` },
+          { field: "quantity", message: `Quantity is required for item ${index + 1} (Error 0098)` },
+          { field: "valueSalesExcludingST", message: `Value Sales Excluding ST is required for item ${index + 1} (Error 0167)` },
+          ...(item.rate.toLowerCase() === "exempt" || formData.scenarioId === "SN006" || formData.scenarioId === "SN007"
             ? [
-                {
-                  field: "sroScheduleNo",
-                  message: `SRO Schedule Number is required for exempt item ${
-                    index + 1
-                  }`,
-                },
-                {
-                  field: "sroItemSerialNo",
-                  message: `SRO Item Serial Number is required for exempt item ${
-                    index + 1
-                  }`,
-                },
+                { field: "sroScheduleNo", message: `SRO Schedule Number is required for exempt item ${index + 1} (Error 0077)` },
+                { field: "sroItemSerialNo", message: `SRO Item Serial Number is required for exempt item ${index + 1} (Error 0078)` },
               ]
             : []),
         ];
 
         for (const { field, message } of itemRequiredFields) {
-          if (
-            !item[field] ||
-            (field === "valueSalesExcludingST" && item[field] <= 0)
-          ) {
+          if (!item[field] || (field === "valueSalesExcludingST" && item[field] <= 0)) {
             Swal.fire({
               icon: "error",
-              title: "Error",
+              title: "Validation Error",
               text: message,
               confirmButtonColor: "#d33",
             });
@@ -451,10 +478,22 @@ export default function CreateInvoice() {
             return;
           }
         }
+
+        // Validate specific scenarios (e.g., Cotton Ginners)
+        if (formData.scenarioId === "SN009" && formData.buyerRegistrationType !== "Registered") {
+          Swal.fire({
+            icon: "error",
+            title: "Validation Error",
+            text: "Cotton Ginners allowed against registered buyers only (Error 0168)",
+            confirmButtonColor: "#d33",
+          });
+          setLoading(false);
+          return;
+        }
       }
 
       const cleanedItems = formData.items.map(
-        ({ isSROScheduleEnabled, isSROItemEnabled, ...rest }) => ({
+        ({ isSROScheduleEnabled, isSROItemEnabled, isValueSalesManual, ...rest }) => ({
           ...rest,
           quantity: rest.quantity === "" ? 0 : parseInt(rest.quantity, 10),
           sroScheduleNo: rest.sroScheduleNo?.trim() || "",
@@ -479,36 +518,36 @@ export default function CreateInvoice() {
       };
 
       const token = localStorage.getItem("token");
-      console.log("Token used:", token);
+      if (!token) {
+        Swal.fire({
+          icon: "error",
+          title: "Authentication Error",
+          text: "No security token found. Please log in again (Error 401)",
+          confirmButtonColor: "#d33",
+        });
+        setLoading(false);
+        return;
+      }
 
-      const validateRes = await postData(
-        "di_data/v1/di/validateinvoicedata_sb",
-        cleanedData
-      );
+      const validateRes = await postData("di_data/v1/di/validateinvoicedata", cleanedData, token);
 
-      if (
-        validateRes.status === 200 &&
-        validateRes.data.validationResponse.statusCode === "00"
-      ) {
+      if (validateRes.status === 200 && validateRes.data.validationResponse.statusCode === "00") {
         try {
-          const postRes = await postData(
-            "di_data/v1/di/postinvoicedata_sb",
-            cleanedData
-          );
-          console.log("Post Invoice Response:", postRes);
-          if (
-            postRes.status === 200 &&
-            postRes.data.validationResponse.statusCode === "00"
-          ) {
+          const postRes = await postData("di_data/v1/di/postinvoicedata", cleanedData, token);
+          if (postRes.status === 200 && postRes.data.validationResponse.statusCode === "00") {
             const createInvoiceResponse = await axios.post(
               "http://45.55.137.96:5150/create-invoice",
               {
                 ...cleanedData,
                 invoiceNumber: postRes.data.invoiceNumber,
                 dated: postRes.data.dated,
+              },
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
               }
             );
-            console.log("Create Invoice Response:", createInvoiceResponse);
             if (createInvoiceResponse.status === 201) {
               Swal.fire({
                 icon: "success",
@@ -522,47 +561,48 @@ export default function CreateInvoice() {
               setIsPrintable(true);
             }
           } else {
+            const errorCode = postRes.data.validationResponse.errorCode;
+            const errorMessage = postRes.data.validationResponse.error || "Invoice submission failed.";
             Swal.fire({
               icon: "error",
-              title: "Error",
-              text:
-                postRes.data.validationResponse.error ||
-                "Invoice submission failed.",
+              title: `Submission Error (${errorCode || "Unknown"})`,
+              text: errorMessage,
               confirmButtonColor: "#d33",
             });
           }
         } catch (postError) {
-          console.error("Post Invoice Error:", {
-            message: postError.message,
-            status: postError.response?.status,
-            data: postError.response?.data,
-          });
+          const errorCode = postError.response?.data?.validationResponse?.errorCode || "500";
+          const errorMessage =
+            postError.response?.data?.validationResponse?.error ||
+            postError.message ||
+            "Internal Server Error (Contact Administrator)";
           Swal.fire({
             icon: "error",
-            title: "Error",
-            text: `Failed to submit invoice: ${
-              postError.response?.data?.validationResponse?.error ||
-              postError.message
-            }`,
+            title: `Submission Error (${errorCode})`,
+            text: errorMessage,
             confirmButtonColor: "#d33",
           });
         }
       } else {
+        const errorCode = validateRes.data.validationResponse.errorCode || "Unknown";
+        const errorMessage = validateRes.data.validationResponse.error || "Invoice validation failed.";
         Swal.fire({
           icon: "error",
-          title: "Error",
-          text:
-            validateRes.data.validationResponse.error ||
-            "Invoice validation failed.",
+          title: `Validation Error (${errorCode})`,
+          text: errorMessage,
           confirmButtonColor: "#d33",
         });
       }
     } catch (error) {
-      console.error("General Error:", error);
+      const errorCode = error.response?.status === 401 ? "401" : "500";
+      const errorMessage =
+        errorCode === "401"
+          ? "Unauthorized: Invalid or expired token"
+          : "Internal Server Error (Contact Administrator)";
       Swal.fire({
         icon: "error",
-        title: "Error",
-        text: `Failed to process the invoice: ${error.message}`,
+        title: `Error (${errorCode})`,
+        text: errorMessage,
         confirmButtonColor: "#d33",
       });
     } finally {
@@ -571,7 +611,20 @@ export default function CreateInvoice() {
   };
 
   const handlePrintInvoice = () => {
-    printInvoice(formData);
+    if (!isPrintable) {
+      Swal.fire({
+        icon: "warning",
+        title: "Cannot Print",
+        text: "Please submit the invoice successfully before printing.",
+        confirmButtonColor: "#d33",
+      });
+      return;
+    }
+    // Placeholder for QR code and logo printing
+    // QR Code: Version 2.0, 25x25, 1.0x1.0 inch
+    // Include FBR Digital Invoicing System logo
+    console.log("Printing invoice with QR code and FBR logo", formData);
+    // Implement actual printing logic here (e.g., generate PDF with QR code)
   };
 
   return (
@@ -1160,6 +1213,26 @@ export default function CreateInvoice() {
           + Add New Item
         </Button>
         <Box>
+          <Button
+            onClick={handlePrintInvoice}
+            variant="contained"
+            color="secondary"
+            sx={{
+              mr: 2,
+              borderRadius: 2,
+              fontWeight: 700,
+              px: 4,
+              py: 1.5,
+              fontSize: 18,
+              letterSpacing: 1,
+              boxShadow: 2,
+              transition: "background 0.2s",
+              "&:hover": { background: "#6d1b7b" },
+            }}
+            disabled={!isPrintable}
+          >
+            Print Invoice
+          </Button>
           <Button
             onClick={handleSubmitChange}
             variant="contained"
