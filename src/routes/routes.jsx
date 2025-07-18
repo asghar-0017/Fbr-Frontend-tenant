@@ -12,7 +12,7 @@ import OTP from "../pages/OTP";
 import ResetPassword from "../pages/ResetPassword";
 import RegisterUser from "../pages/RegisterUser";
 import { RegisteredUsers } from "../pages/RegisteredUsers";
-import ProductionForm from "../pages/productionForm"
+// import ProductionForm from "../pages/productionForm"
 
 const SidebarWithLogout = () => {
   const { logout } = useAuth();
@@ -40,7 +40,7 @@ const AppRouter = () => {
             <Route path="your-invoices" element={<YourInvoices />} />
             <Route path="register-buyer" element={<RegisterUser />} />
             <Route path="registered-users" element={<RegisteredUsers />} />
-            <Route path="productoin-invoice" element={<ProductionForm />} />
+            {/* <Route path="productoin-invoice" element={<ProductionForm />} /> */}
           </Route>
         </Routes>
       </AuthProvider>

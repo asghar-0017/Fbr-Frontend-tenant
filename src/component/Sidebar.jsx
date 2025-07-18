@@ -23,13 +23,13 @@ import { href, NavLink, Outlet, Route, Routes } from "react-router-dom";
 import YourInvoices from "../pages/YourInvoices";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { Button } from "@mui/material";
-import productionForm  from "../pages/productionForm"
+// import productionForm  from "../pages/productionForm"
 
 const navItems = [
   { name: "SandBox Invoice form", href: "/" },
   { name: "Your Invoices", href: "/your-invoices" },
   { name: "Register Buyer", href: "/register-buyer" },
-  { name: "production Invoice Form", href: "/productoin-invoice" },
+  // { name: "production Invoice Form", href: "/prod  uctoin-invoice" },
   { name: "logout" },
 ];
 

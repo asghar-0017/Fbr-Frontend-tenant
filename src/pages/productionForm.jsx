@@ -16,7 +16,6 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import Button from "@mui/material/Button";
 import dayjs from "dayjs";
-import { scenarioData } from "../component/ScnerioData";
 import { fetchData, postData } from "../API/GetApi";
 import RateSelector from "../component/RateSelector";
 import SROScheduleNumber from "../component/SROScheduleNumber";
@@ -30,7 +29,7 @@ import API_CONFIG from "../API/Api";
 
 const { apiKeyLocal, sandBoxTestToken } = API_CONFIG;
 
-export default function productionFoam() {
+export default function ProductionFoam() {
   const [formData, setFormData] = React.useState({
     invoiceType: "",
     invoiceDate: dayjs(),
@@ -44,7 +43,7 @@ export default function productionFoam() {
     buyerAddress: "",
     buyerRegistrationType: "",
     invoiceRefNo: "",
-    scenarioId: "",
+    transactionTypeId: "",
     items: [
       {
         hsCode: "",
@@ -71,7 +70,7 @@ export default function productionFoam() {
     ],
   });
 
-  const [scenario, setScenario] = React.useState([]);
+  const [transactionTypes, setTransactionTypes] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [isPrintable, setIsPrintable] = React.useState(false);
   const [province, setProvince] = React.useState([]);
@@ -117,7 +116,7 @@ export default function productionFoam() {
             { docTypeId: 9, docDescription: "Debit Note" },
           ])
         ),
-      fetchData("pdi/v1/transtypecode").then((res) => setScenario(res)),
+      fetchData("pdi/v1/transtypecode").then((res) => setTransactionTypes(res)),
     ]).finally(() => setAllLoading(false));
   }, []);
 
@@ -236,43 +235,24 @@ export default function productionFoam() {
       item.fedPayable = Number(item.fedPayable) || 0;
       item.discount = Number(item.discount) || 0;
   
-      // Avoid overwriting 3rd Schedule totals
-      const isThirdSchedule =
-        item.saleType === "3rd Schedule Goods" ||
-        prev.scenarioId === "SN027" ||
-        prev.scenarioId === "SN008";
+      // Calculate totals
+      item.totalValues =
+        Number(item.valueSalesExcludingST) +
+        Number(item.salesTaxApplicable) +
+        Number(item.furtherTax) +
+        Number(item.fedPayable) +
+        Number(item.extraTax) -
+        Number(item.discount);
   
-      if (!isThirdSchedule) {
-        item.totalValues =
-          Number(item.valueSalesExcludingST) +
-          Number(item.salesTaxApplicable) +
-          Number(item.furtherTax) +
-          Number(item.fedPayable) +
-          Number(item.extraTax) -
-          Number(item.discount);
-  
-        item.totalValues = Number(item.totalValues.toFixed(2));
-      }
-  
-      // Only round salesTaxApplicable if not 3rd Schedule
-      if (!isThirdSchedule) {
-        item.salesTaxApplicable = Number(item.salesTaxApplicable.toFixed(2));
-      }
+      item.totalValues = Number(item.totalValues.toFixed(2));
+      item.salesTaxApplicable = Number(item.salesTaxApplicable.toFixed(2));
   
       updatedItems[index] = item;
       return { ...prev, items: updatedItems };
     });
   };
-  
 
   const addNewItem = () => {
-    const selectedScenario = scenarioData.find(
-      (item) => item.id === formData.scenarioId
-    );
-    const saleType = selectedScenario
-      ? selectedScenario.saleType
-      : "Goods at Standard Rate (default)";
-
     setFormData((prev) => ({
       ...prev,
       items: [
@@ -294,14 +274,13 @@ export default function productionFoam() {
           furtherTax: 0,
           fedPayable: 0,
           discount: 0,
-          saleType,
+          saleType: "Goods at Standard Rate (default)",
           isSROScheduleEnabled: false,
           isSROItemEnabled: false,
           isValueSalesManual: false,
         },
       ],
-    }));
-  };
+  }));
 
   const removeItem = (index) => {
     setFormData((prev) => ({
@@ -310,87 +289,20 @@ export default function productionFoam() {
     }));
   };
 
-  const handleScenarioChange = (id) => {
-    const selectedScenario = scenarioData.find((item) => item.id === id);
-
-    if (!selectedScenario) {
-      setFormData((prev) => ({
-        ...prev,
-        scenarioId: id,
-      }));
-      localStorage.removeItem("saleType");
-      localStorage.removeItem("productDescription");
-      return;
-    }
-
-    // Set correct saleType and transactionTypeId in localStorage
-    let saleType = selectedScenario.saleType || "";
-    let transactionTypeId = null;
-
-    if (id === "SN016") {
-      saleType = "Processing/Conversion of Goods";
-      transactionTypeId = "25";
-    } else if (id === "SN024") {
-      // If SN024 needs a special case, set it here
-      saleType = "Goods as per SRO.297(|)/2023";
-      transactionTypeId = "139";
-    } else {
-      const normalize = str => str?.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-      const matchingApiRecord = scenario.find(
-        (item) =>
-          item.transactioN_DESC &&
-          normalize(item.transactioN_DESC) === normalize(saleType)
-      );
-      if (matchingApiRecord) {
-        transactionTypeId = matchingApiRecord.transactioN_TYPE_ID;
-        saleType = matchingApiRecord.transactioN_DESC;
-      }
-    }
-
-    localStorage.setItem("saleType", saleType);
-    localStorage.setItem("productDescription", selectedScenario.description);
-    if (transactionTypeId) {
-      localStorage.setItem("transactionTypeId", transactionTypeId);
-    } else {
-      localStorage.removeItem("transactionTypeId");
-    }
-
-    // If no items, add a default item
-    setFormData((prev) => {
-      const items = prev.items.length > 0
-        ? prev.items.map((item) => ({
-            ...item,
-            productDescription: selectedScenario.description,
-            saleType: saleType,
-          }))
-        : [{
-            hsCode: "",
-            productDescription: selectedScenario.description,
-            rate: "",
-            uoM: "",
-            quantity: 1,
-            totalValues: 0,
-            valueSalesExcludingST: 0,
-            fixedNotifiedValueOrRetailPrice: 1,
-            salesTaxApplicable: 0,
-            salesTaxWithheldAtSource: 0,
-            sroScheduleNo: "",
-            sroItemSerialNo: "",
-            extraTax: "",
-            furtherTax: 0,
-            fedPayable: 0,
-            discount: 0,
-            saleType,
-            isSROScheduleEnabled: false,
-            isSROItemEnabled: false,
-            isValueSalesManual: false,
-          }];
-      return {
-        ...prev,
-        scenarioId: id,
-        items,
-      };
-    });
+  const handleTransactionTypeChange = (desc) => {
+    const selectedType = transactionTypes.find((item) => item.transactioN_DESC === desc);
+    if (!selectedType) return;
+    console.log("selectedType", selectedType.transactioN_TYPE_ID);
+    localStorage.setItem("transactionTypeId", selectedType.transactioN_TYPE_ID);
+    localStorage.setItem("saleType", selectedType.transactioN_DESC);
+    setFormData((prev) => ({
+      ...prev,
+      transactionTypeId: selectedType.transactioN_TYPE_ID,
+      items: prev.items.map((item) => ({
+        ...item,
+        saleType: selectedType.transactioN_DESC,
+      })),
+    }));
   };
 
   const handleSubmitChange = async () => {
@@ -501,29 +413,18 @@ export default function productionFoam() {
           console.log("Post Invoice Response:", postRes);
           if (
             postRes.status === 200 &&
-            postRes.data.validationResponse.statusCode === "00"
+        postRes.data.validationResponse.statusCode === "00"
           ) {
-            const createInvoiceResponse = await axios.post(
-              "http://45.55.137.96:5150/create-invoice",
-              {
-                ...cleanedData,
-                invoiceNumber: postRes.data.invoiceNumber,
-                dated: postRes.data.dated,
-              }
-            );
-            console.log("Create Invoice Response:", createInvoiceResponse);
-            if (createInvoiceResponse.status === 201) {
-              Swal.fire({
-                icon: "success",
-                title: "Success",
-                text: `Invoice submitted successfully! Invoice Number: ${postRes.data.invoiceNumber}`,
-                confirmButtonColor: "#28a745",
-                willClose: () => {
-                  navigate("/your-invoices");
-                },
-              });
-              setIsPrintable(true);
-            }
+            Swal.fire({
+              icon: "success",
+              title: "Success",
+              text: `Invoice submitted successfully! Invoice Number: ${postRes.data.invoiceNumber}`,
+              confirmButtonColor: "#28a745",
+              willClose: () => {
+                navigate("/your-invoices");
+              },
+            });
+            setIsPrintable(true);
           } else {
             Swal.fire({
               icon: "error",
@@ -590,19 +491,6 @@ export default function productionFoam() {
         mb: 6,
       }}
     >
-      <Typography
-        variant="h4"
-        sx={{
-          mb: 3,
-          fontWeight: 900,
-          textTransform: "uppercase",
-          color: "#1976d2",
-          letterSpacing: 2,
-          textAlign: "center",
-        }}
-      >
-        Invoice Creation
-      </Typography>
       {/* Invoice Type Section */}
       <Box
         sx={{
@@ -792,7 +680,7 @@ export default function productionFoam() {
           </Box>
         </Box>
       </Box>
-      {/* Scenario Section */}
+      {/* Transaction Type Section */}
       <Typography
         variant="h6"
         sx={{
@@ -803,7 +691,7 @@ export default function productionFoam() {
           letterSpacing: 1,
         }}
       >
-        Scenario
+        Transaction Type
       </Typography>
       <Box
         sx={{
@@ -820,35 +708,25 @@ export default function productionFoam() {
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
           <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
             <FormControl fullWidth>
-              <InputLabel id="scenarioId">Scenario</InputLabel>
+              <InputLabel id="transaction-type-label">Transaction Type</InputLabel>
               <Select
-                labelId="scenarioId"
-                name="scenarioId"
-                value={formData.scenarioId ?? ""}
-                label="Scenario"
-                onChange={(e) => handleScenarioChange(e.target.value)}
+                labelId="transaction-type-label"
+                value={formData.transactionTypeDesc}
+                label="Transaction Type"
+                onChange={(e) => handleTransactionTypeChange(e.target.value)}
               >
                 <MenuItem value="">
-                  <em>Select a scenario</em>
+                  <em>Select a transaction type</em>
                 </MenuItem>
-                {scenarioData.map((curElem) => (
-                  <MenuItem key={curElem.id} value={curElem.id}>
-                    {curElem.id} - {curElem.description}
+                {transactionTypes.map((type) => (
+                  <MenuItem key={type.transactioN_TYPE_ID} value={type.transactioN_DESC}>
+                    {type.transactioN_TYPE_ID} {type.transactioN_DESC}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
           </Box>
         </Box>
-        {formData.scenarioId && (
-          <Typography
-            variant="body2"
-            sx={{ mt: 1, ml: 2, color: "text.secondary" }}
-          >
-            {scenarioData.find((s) => s.id === formData.scenarioId)?.description ||
-              ""}
-          </Typography>
-        )}
       </Box>
       {/* Items Section */}
       <Typography
@@ -894,14 +772,7 @@ export default function productionFoam() {
                     "hsCode",
                     newValue ? newValue.hS_CODE : ""
                   );
-                  const selectedScenario = scenarioData.find(
-                    (s) => s.id === formData.scenarioId
-                  );
-                  handleItemChange(
-                    index,
-                    "productDescription",
-                    selectedScenario ? selectedScenario.description : ""
-                  );
+                  handleItemChange(index, "productDescription", "");
                 }}
                 renderInput={(params) => (
                   <TextField {...params} label="HS Code" variant="outlined" />
@@ -923,7 +794,7 @@ export default function productionFoam() {
               index={index}
               item={item}
               handleItemChange={handleItemChange}
-              transactionTypeId={localStorage.getItem("transactionTypeId")}
+              transactionTypeId={formData.transactionTypeId}
               selectedProvince={formData.sellerProvince}
             />
             <SROScheduleNumber
@@ -951,9 +822,7 @@ export default function productionFoam() {
                 fullWidth
                 label="Product Description"
                 value={item.productDescription || ""}
-                InputProps={{
-                  readOnly: true,
-                }}
+                onChange={(e) => handleItemChange(index, "productDescription", e.target.value)}
                 variant="outlined"
               />
             </Box>
@@ -1208,5 +1077,6 @@ export default function productionFoam() {
         </Box>
       )}
     </Box>
-  );
+  )
+}
 }
