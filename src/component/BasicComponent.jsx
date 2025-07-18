@@ -18,7 +18,11 @@ import {
   TextField,
   MenuItem,
   InputAdornment,
+  Pagination,
 } from "@mui/material";
+import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs from 'dayjs';
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import PrintIcon from "@mui/icons-material/Print";
 import { green } from "@mui/material/colors";
@@ -38,6 +42,9 @@ export default function BasicTable() {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [search, setSearch] = useState("");
   const [saleType, setSaleType] = useState("All");
+  const [page, setPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [invoiceDate, setInvoiceDate] = useState(null);
   const theme = useTheme();
 
   const getMyInvoices = async () => {
@@ -85,16 +92,25 @@ export default function BasicTable() {
   // Sort invoices so the last one (newest) appears first
   const sortedInvoices = [...invoices].reverse();
 
-  // Filtered invoices
-  const filteredInvoices = [...invoices].filter((row) => {
+  // Filtered invoices with date filter
+  const filteredInvoices = [...(invoices || [])].filter((row) => {
     // Sale type filter
     const saleTypeMatch = saleType === "All" || (row.invoiceType || "").toLowerCase().includes(saleType.toLowerCase());
     // Search filter (invoice number or buyer NTN)
     const searchLower = search.trim().toLowerCase();
     const invoiceNumberMatch = (row.invoiceNumber || "").toString().toLowerCase().includes(searchLower);
     const buyerNTNMatch = (row.buyerNTNCNIC || "").toString().toLowerCase().includes(searchLower);
-    return saleTypeMatch && (invoiceNumberMatch || buyerNTNMatch);
+    // Date filter (single date)
+    let dateMatch = true;
+    if (invoiceDate) {
+      dateMatch = dayjs(row.invoiceDate).isSame(dayjs(invoiceDate), 'day');
+    }
+    return saleTypeMatch && (invoiceNumberMatch || buyerNTNMatch) && dateMatch;
   }).reverse();
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredInvoices.length / rowsPerPage);
+  const paginatedInvoices = filteredInvoices.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
   return (
     <>
@@ -147,7 +163,7 @@ export default function BasicTable() {
               size="small"
               placeholder="Search by Invoice # or Buyer NTN"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -162,13 +178,21 @@ export default function BasicTable() {
               label="Sale Type"
               size="small"
               value={saleType}
-              onChange={e => setSaleType(e.target.value)}
+              onChange={e => { setSaleType(e.target.value); setPage(1); }}
               sx={{ minWidth: 160 }}
             >
               <MenuItem value="All">All</MenuItem>
               <MenuItem value="Sale Invoice">Sale Invoice</MenuItem>
               <MenuItem value="Debit Note">Debit Note</MenuItem>
             </TextField>
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <DatePicker
+                label="Invoice Date"
+                value={invoiceDate}
+                onChange={val => { setInvoiceDate(val); setPage(1); }}
+                slotProps={{ textField: { size: 'small', sx: { minWidth: 140 } } }}
+              />
+            </LocalizationProvider>
           </Box>
 
           {/* Empty State */}
@@ -183,6 +207,7 @@ export default function BasicTable() {
               </Typography>
             </Box>
           ) : (
+            <>
             <TableContainer
               component={Paper}
               elevation={4}
@@ -223,7 +248,7 @@ export default function BasicTable() {
                 </TableHead>
 
                 <TableBody>
-                  {filteredInvoices.map((row, index) => (
+                  {paginatedInvoices.map((row, index) => (
                     <TableRow
                       key={row._id || index}
                       sx={{
@@ -307,6 +332,19 @@ export default function BasicTable() {
                 </TableBody>
               </Table>
             </TableContainer>
+            {/* Pagination Controls */}
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+              <Pagination
+                count={totalPages}
+                page={page}
+                onChange={(_, value) => setPage(value)}
+                color="primary"
+                shape="rounded"
+                showFirstButton
+                showLastButton
+              />
+            </Box>
+            </>
           )}
 
           {/* Invoice Details Modal (unchanged) */}

@@ -196,35 +196,38 @@ export default function CreateInvoice() {
   
       // Begin calculations
       if (!item.isValueSalesManual) {
-        const quantity = parseFloat(item.quantity || 0);
+        // NEW LOGIC: unitCost is the total cost, not multiplied by quantity
         const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
-        const retailPrice = unitCost * quantity;
         const rate = parseFloat((item.rate || "0").replace("%", "")) || 0;
-  
-        const isThirdSchedule =
-          item.saleType === "3rd Schedule Goods" ||
-          prev.scenarioId === "SN027" ||
-          prev.scenarioId === "SN008";
-  
-        if (isThirdSchedule) {
-          // Use regular calculation for 3rd schedule
-          item.valueSalesExcludingST = retailPrice;
-          let rateFraction = rate / 100;
+
+        // Value without sales tax is just the unit cost
+        item.valueSalesExcludingST = unitCost;
+
+        // Sales tax
+        let rateFraction = 0;
+        if (item.rate && item.rate.toLowerCase() !== "exempt" && item.rate !== "0%") {
+          rateFraction = rate / 100;
           item.salesTaxApplicable = Number((item.valueSalesExcludingST * rateFraction).toFixed(2));
-          item.totalValues = Number((item.valueSalesExcludingST + item.salesTaxApplicable).toFixed(2));
         } else {
-          // Normal items
-          item.valueSalesExcludingST = retailPrice;
-          let rateFraction = 0;
-          if (item.rate && item.rate.toLowerCase() !== "exempt" && item.rate !== "0%") {
-            rateFraction = rate / 100;
-            item.salesTaxApplicable = Number((item.valueSalesExcludingST * rateFraction).toFixed(2));
-          } else {
-            item.salesTaxApplicable = 0;
-            item.salesTaxWithheldAtSource = 0;
-          }
-          item.totalValues = Number((item.valueSalesExcludingST + item.salesTaxApplicable).toFixed(2));
+          item.salesTaxApplicable = 0;
+          item.salesTaxWithheldAtSource = 0;
         }
+
+        // Total before discount
+        let totalBeforeDiscount =
+          Number(item.valueSalesExcludingST) +
+          Number(item.salesTaxApplicable) +
+          Number(item.furtherTax) +
+          Number(item.fedPayable) +
+          Number(item.extraTax);
+
+        // Discount as percentage
+        let discountPercent = Number(item.discount) || 0;
+        let discountAmount = 0;
+        if (discountPercent > 0) {
+          discountAmount = (totalBeforeDiscount * discountPercent) / 100;
+        }
+        item.totalValues = Number((totalBeforeDiscount - discountAmount).toFixed(2));
       }
   
       // Parse extra fields always as numbers
