@@ -10,14 +10,16 @@ const RateSelector = ({
   selectedProvince,
 }) => {
   const [rates, setRates] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Function to fetch rate data
   const getRateData = async () => {
-    if (!transactionTypeId) {
+    if (!transactionTypeId || !selectedProvince) {
+      setRates([]);
       return null;
     }
+    setLoading(true);
     try {
-      var transctionId = localStorage.getItem("transactionTypeId");
       const provinceResponse = JSON.parse(
         localStorage.getItem("provinceResponse")
       );
@@ -29,40 +31,39 @@ const RateSelector = ({
         console.warn(
           `Province not found in provinceResponse: ${selectedProvince}`
         );
+        setRates([]);
         return;
       }
       const stateProvinceCode = selectedProvinceObj?.stateProvinceCode;
 
       const response = await fetchData(
-        `pdi/v2/SaleTypeToRate?date=24-Feb-2024&transTypeId=${transctionId}&originationSupplier=${stateProvinceCode}`
+        `pdi/v2/SaleTypeToRate?date=24-Feb-2024&transTypeId=${transactionTypeId}&originationSupplier=${stateProvinceCode}`
       );
-      console.log(
-        "responseresponseresponseresponseresponseresponseresponseresponseresponseresponse",
-        response
-      );
-      console.log("Transaction Type ID:", transctionId);
-      setRates(response);
-      return response;
+      console.log("Rate Response:", response);
+      console.log("Transaction Type ID:", transactionTypeId);
+      setRates(response || []);
     } catch (error) {
       console.error("Error fetching rates:", error);
-      return [];
+      setRates([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Fetch rates on component mount
+  // Fetch rates on component mount and when dependencies change
   useEffect(() => {
     getRateData();
   }, [transactionTypeId, selectedProvince]);
 
   // Handle rate selection and save ratE_ID to localStorage
   const handleRateChange = (event) => {
-    const selectedRate = event.target.value; // e.g., "18%"
+    const selectedRate = event.target.value;
     const selectedRateObj = rates.find(
       (rate) => rate.ratE_DESC === selectedRate
     );
     if (selectedRateObj) {
       localStorage.setItem("selectedRateId", selectedRateObj.ratE_ID);
-      console.log(`Saved ratE_ID: ${selectedRateObj.ratE_ID} to localStorage`);
+      console.log(`Selected Rate ID: ${selectedRateObj.ratE_ID}`);
     }
     handleItemChange(index, "rate", selectedRate);
   };
@@ -79,12 +80,16 @@ const RateSelector = ({
           value={item.rate || ""}
           label="Rate"
           onChange={handleRateChange}
-          disabled={showScenarioMessage || showProvinceMessage}
+          disabled={showScenarioMessage || showProvinceMessage || loading}
         >
           {showScenarioMessage ? (
             <MenuItem value="">Please select scenario first</MenuItem>
           ) : showProvinceMessage ? (
             <MenuItem value="">Please select province first</MenuItem>
+          ) : loading ? (
+            <MenuItem value="">Loading rates...</MenuItem>
+          ) : rates.length === 0 ? (
+            <MenuItem value="">No rates available</MenuItem>
           ) : (
             rates.map((rate) => (
               <MenuItem key={rate.ratE_ID} value={rate.ratE_DESC}>

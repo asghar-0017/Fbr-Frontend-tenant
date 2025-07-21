@@ -10,7 +10,7 @@ export const scenarioData = [
     saleType: "Goods at Standard Rate (default)",
   },
   {
-    id: "SN003",
+    id: "SN003",  
     description: "Sale of Steel (Melted and Re-Rolled)",
     saleType: "Steel Melting and re-rolling",
   },

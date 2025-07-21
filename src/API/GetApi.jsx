@@ -1,5 +1,5 @@
 import axios from "axios";
-import API_CONFIG from "./Api";
+import { API_CONFIG } from "./Api";
 import Swal from "sweetalert2";
 
 const { apiKey,sandBoxTestToken } = API_CONFIG;

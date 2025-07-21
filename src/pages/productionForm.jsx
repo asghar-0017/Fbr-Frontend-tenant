@@ -25,7 +25,7 @@ import Swal from "sweetalert2";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import API_CONFIG from "../API/Api";
+import {API_CONFIG} from "../API/Api";
 
 const { apiKeyLocal, sandBoxTestToken } = API_CONFIG;
 

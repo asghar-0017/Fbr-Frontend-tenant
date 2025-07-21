@@ -28,7 +28,8 @@ import { Button } from "@mui/material";
 const navItems = [
   { name: "SandBox Invoice form", href: "/" },
   { name: "Your Invoices", href: "/your-invoices" },
-  { name: "Register Buyer", href: "/register-buyer" },
+  // { name: "Register Buyer", href: "/register-buyer" },
+  { name: "Buyers", href: "/buyers" },
   // { name: "production Invoice Form", href: "/prod  uctoin-invoice" },
   { name: "logout" },
 ];

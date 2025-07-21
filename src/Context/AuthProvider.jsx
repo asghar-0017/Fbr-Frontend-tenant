@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import API_CONFIG from "../API/Api";
+import { API_CONFIG } from "../API/Api";
 
 const { apiKeyLocal } = API_CONFIG;
 

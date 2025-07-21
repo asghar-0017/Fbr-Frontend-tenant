@@ -26,7 +26,7 @@ import Swal from "sweetalert2";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import API_CONFIG from "../API/Api";
+import { API_CONFIG } from "../API/Api";
 
 const { apiKeyLocal, sandBoxTestToken } = API_CONFIG;
 
@@ -52,9 +52,10 @@ export default function CreateInvoice() {
         rate: "",
         uoM: "",
         quantity: 1,
+        unitPrice: 0, // NEW FIELD
+        retailPrice: 0, // RENAMED
         totalValues: 0,
         valueSalesExcludingST: 0,
-        fixedNotifiedValueOrRetailPrice: 1,
         salesTaxApplicable: 0,
         salesTaxWithheldAtSource: 0,
         sroScheduleNo: "",
@@ -81,6 +82,7 @@ export default function CreateInvoice() {
   const [selectedBuyerId, setSelectedBuyerId] = useState("");
   const navigate = useNavigate();
   const [allLoading, setAllLoading] = React.useState(true);
+  const [transactionTypeId, setTransactionTypeId] = React.useState(null);
 
   const handleChange = (name, value) => {
     setFormData((prev) => ({
@@ -117,7 +119,10 @@ export default function CreateInvoice() {
             { docTypeId: 9, docDescription: "Debit Note" },
           ])
         ),
-      fetchData("pdi/v1/transtypecode").then((res) => setScenario(res)),
+      fetchData("pdi/v1/transtypecode").then((res) => {
+        console.log("Transaction types:", res);
+        setScenario(res);
+      }),
     ]).finally(() => setAllLoading(false));
   }, []);
 
@@ -152,16 +157,17 @@ export default function CreateInvoice() {
     setFormData((prev) => {
       const updatedItems = [...prev.items];
       const item = { ...updatedItems[index] };
-  
+
       // Utility to parse values
       const parseValue = (val, isFloat = true) =>
         val === "" ? (isFloat ? 0 : "") : isFloat ? parseFloat(val) || 0 : val;
-  
+
       // Update the field
       if (
         [
           "quantity",
-          "fixedNotifiedValueOrRetailPrice",
+          "unitPrice", // NEW
+          "retailPrice", // RENAMED
           "valueSalesExcludingST",
           "salesTaxApplicable",
           "totalValues",
@@ -179,7 +185,7 @@ export default function CreateInvoice() {
       } else {
         item[field] = value;
       }
-  
+
       // Handle SRO reset logic
       if (field === "rate" && value) {
         item.isSROScheduleEnabled = true;
@@ -188,90 +194,68 @@ export default function CreateInvoice() {
         item.isSROItemEnabled = false;
         item.isValueSalesManual = false;
       }
-  
+
       if (field === "sroScheduleNo" && value) {
         item.isSROItemEnabled = true;
         item.sroItemSerialNo = "";
       }
-  
+
       // Begin calculations
-      if (!item.isValueSalesManual) {
-        // NEW LOGIC: unitCost is the total cost, not multiplied by quantity
-        const unitCost = parseFloat(item.fixedNotifiedValueOrRetailPrice || 0);
-        const rate = parseFloat((item.rate || "0").replace("%", "")) || 0;
-
-        // Value without sales tax is just the unit cost
-        item.valueSalesExcludingST = unitCost;
-
-        // Sales tax
-        let rateFraction = 0;
-        if (item.rate && item.rate.toLowerCase() !== "exempt" && item.rate !== "0%") {
-          rateFraction = rate / 100;
-          item.salesTaxApplicable = Number((item.valueSalesExcludingST * rateFraction).toFixed(2));
-        } else {
-          item.salesTaxApplicable = 0;
-          item.salesTaxWithheldAtSource = 0;
-        }
-
-        // Total before discount
-        let totalBeforeDiscount =
-          Number(item.valueSalesExcludingST) +
-          Number(item.salesTaxApplicable) +
-          Number(item.furtherTax) +
-          Number(item.fedPayable) +
-          Number(item.extraTax);
-
-        // Discount as percentage
-        let discountPercent = Number(item.discount) || 0;
-        let discountAmount = 0;
-        if (discountPercent > 0) {
-          discountAmount = (totalBeforeDiscount * discountPercent) / 100;
-        }
-        item.totalValues = Number((totalBeforeDiscount - discountAmount).toFixed(2));
-      }
-  
-      // Parse extra fields always as numbers
-      item.extraTax = parseInt(item.extraTax, 10) || 0;
-      item.furtherTax = Number(item.furtherTax) || 0;
-      item.fedPayable = Number(item.fedPayable) || 0;
-      item.discount = Number(item.discount) || 0;
-  
-      // Avoid overwriting 3rd Schedule totals
       const isThirdSchedule =
         item.saleType === "3rd Schedule Goods" ||
         prev.scenarioId === "SN027" ||
         prev.scenarioId === "SN008";
-  
-      if (!isThirdSchedule) {
-        item.totalValues =
-          Number(item.valueSalesExcludingST) +
-          Number(item.salesTaxApplicable) +
-          Number(item.furtherTax) +
-          Number(item.fedPayable) +
-          Number(item.extraTax) -
-          Number(item.discount);
-  
-        item.totalValues = Number(item.totalValues.toFixed(2));
+
+      // Auto-calculate retail price and sales tax if not manual and not 3rd schedule
+      if (!item.isValueSalesManual && !isThirdSchedule) {
+        const unitPrice = parseFloat(item.unitPrice || 0);
+        const quantity = parseFloat(item.quantity || 0);
+        item.retailPrice = unitPrice * quantity;
+        item.valueSalesExcludingST = item.retailPrice;
+
+        const rate = parseFloat((item.rate || "0").replace("%", "")) || 0;
+        if (
+          item.rate &&
+          item.rate.toLowerCase() !== "exempt" &&
+          item.rate !== "0%"
+        ) {
+          const rateFraction = rate / 100;
+          item.salesTaxApplicable = Number(
+            (item.valueSalesExcludingST * rateFraction).toFixed(2)
+          );
+        } else {
+          item.salesTaxApplicable = 0;
+        }
       }
-  
-      // Only round salesTaxApplicable if not 3rd Schedule
+
+      // Always recalculate total value unless it is a 3rd schedule item
       if (!isThirdSchedule) {
-        item.salesTaxApplicable = Number(item.salesTaxApplicable.toFixed(2));
+        const totalBeforeDiscount =
+          Number(item.valueSalesExcludingST || 0) +
+          Number(item.salesTaxApplicable || 0) +
+          Number(item.furtherTax || 0) +
+          Number(item.fedPayable || 0) +
+          Number(item.extraTax || 0);
+
+        const discountPercent = Number(item.discount || 0);
+        const discountAmount = (totalBeforeDiscount * discountPercent) / 100;
+
+        const totalAfterDiscount = totalBeforeDiscount - discountAmount;
+
+        const taxWithheld = Number(item.salesTaxWithheldAtSource || 0);
+
+        item.totalValues = Number((totalAfterDiscount + taxWithheld).toFixed(2));
       }
-  
+
       updatedItems[index] = item;
       return { ...prev, items: updatedItems };
     });
   };
-  
+
 
   const addNewItem = () => {
-    const selectedScenario = scenarioData.find(
-      (item) => item.id === formData.scenarioId
-    );
-    const saleType = selectedScenario
-      ? selectedScenario.saleType
-      : "Goods at Standard Rate (default)";
+    const saleType = localStorage.getItem("saleType") || "Goods at Standard Rate (default)";
+    const productDescription = localStorage.getItem("productDescription") || "";
 
     setFormData((prev) => ({
       ...prev,
@@ -279,13 +263,14 @@ export default function CreateInvoice() {
         ...prev.items,
         {
           hsCode: "",
-          productDescription: "",
+          productDescription: productDescription,
           rate: "",
           uoM: "",
           quantity: 1,
+          unitPrice: 0, // NEW FIELD
+          retailPrice: 0, // RENAMED
           totalValues: 0,
           valueSalesExcludingST: 0,
-          fixedNotifiedValueOrRetailPrice: 1,
           salesTaxApplicable: 0,
           salesTaxWithheldAtSource: 0,
           sroScheduleNo: "",
@@ -320,48 +305,63 @@ export default function CreateInvoice() {
       }));
       localStorage.removeItem("saleType");
       localStorage.removeItem("productDescription");
+      setTransactionTypeId(null);
       return;
     }
 
-    // Set correct saleType and transactionTypeId in localStorage
+    // Set correct saleType and transactionTypeId
     let saleType = selectedScenario.saleType || "";
-    let transactionTypeId = null;
+    let newTransactionTypeId = null;
 
+    // Special cases for specific scenarios
     if (id === "SN016") {
       saleType = "Processing/Conversion of Goods";
-      transactionTypeId = "25";
+      newTransactionTypeId = "25";
     } else if (id === "SN024") {
-      // If SN024 needs a special case, set it here
       saleType = "Goods as per SRO.297(|)/2023";
-      transactionTypeId = "139";
+      newTransactionTypeId = "139";
+    } else if (id === "SN002") {
+      newTransactionTypeId = "75";
+      saleType = "Goods at standard rate (default)";
     } else {
-      const normalize = str => str?.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-      const matchingApiRecord = scenario.find(
-        (item) =>
+      // Find matching transaction type from API response
+      const matchingApiRecord = scenario.find((item) => {
+        const normalizeStr = (str) => str?.toLowerCase().replace(/[^a-z0-9]/g, "");
+        return (
           item.transactioN_DESC &&
-          normalize(item.transactioN_DESC) === normalize(saleType)
-      );
+          normalizeStr(item.transactioN_DESC) === normalizeStr(saleType)
+        );
+      });
+
       if (matchingApiRecord) {
-        transactionTypeId = matchingApiRecord.transactioN_TYPE_ID;
+        newTransactionTypeId = matchingApiRecord.transactioN_TYPE_ID;
         saleType = matchingApiRecord.transactioN_DESC;
       }
     }
 
+    console.log("Selected scenario:", id);
+    console.log("Sale type:", saleType);
+    console.log("Transaction type ID:", newTransactionTypeId);
+
+    // Update localStorage and state
     localStorage.setItem("saleType", saleType);
     localStorage.setItem("productDescription", selectedScenario.description);
-    if (transactionTypeId) {
-      localStorage.setItem("transactionTypeId", transactionTypeId);
+    if (newTransactionTypeId) {
+      localStorage.setItem("transactionTypeId", newTransactionTypeId);
+      setTransactionTypeId(newTransactionTypeId);
     } else {
       localStorage.removeItem("transactionTypeId");
+      setTransactionTypeId(null);
     }
 
-    // If no items, add a default item
+    // Update form data
     setFormData((prev) => {
       const items = prev.items.length > 0
         ? prev.items.map((item) => ({
             ...item,
             productDescription: selectedScenario.description,
             saleType: saleType,
+            rate: "", // Reset rate when scenario changes
           }))
         : [{
             hsCode: "",
@@ -457,11 +457,12 @@ export default function CreateInvoice() {
       }
 
       const cleanedItems = formData.items.map(
-        ({ isSROScheduleEnabled, isSROItemEnabled, ...rest }) => ({
+        ({ isSROScheduleEnabled, isSROItemEnabled, retailPrice, ...rest }) => ({
           ...rest,
+          fixedNotifiedValueOrRetailPrice: Number(Number(retailPrice).toFixed(2)), // send as required by FBR
           quantity: rest.quantity === "" ? 0 : parseInt(rest.quantity, 10),
-          sroScheduleNo: rest.sroScheduleNo?.trim() || "",
-          sroItemSerialNo: rest.sroItemSerialNo?.trim() || "",
+          sroScheduleNo: rest.sroScheduleNo?.trim() || "N/A",
+          sroItemSerialNo: rest.sroItemSerialNo?.trim() || "N/A",
           productDescription: rest.productDescription?.trim() || "N/A",
           saleType: rest.saleType?.trim() || "Goods at standard rate (default)",
           extraTax: (rest.extraTax !== undefined && rest.extraTax !== null && rest.extraTax !== "" && Number(rest.extraTax) !== 0)
@@ -923,7 +924,7 @@ export default function CreateInvoice() {
               index={index}
               item={item}
               handleItemChange={handleItemChange}
-              transactionTypeId={localStorage.getItem("transactionTypeId")}
+              transactionTypeId={transactionTypeId}
               selectedProvince={formData.sellerProvince}
             />
             <SROScheduleNumber
@@ -985,20 +986,15 @@ export default function CreateInvoice() {
             <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
               <TextField
                 fullWidth
-                label="Unit Cost"
+                label="Unit Price"
                 type="number"
-                value={item.fixedNotifiedValueOrRetailPrice}
+                value={item.unitPrice}
                 onChange={(e) =>
-                  handleItemChange(
-                    index,
-                    "fixedNotifiedValueOrRetailPrice",
-                    e.target.value
-                  )
+                  handleItemChange(index, "unitPrice", e.target.value)
                 }
                 variant="outlined"
               />
             </Box>
-
             <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
               <TextField
                 fullWidth
@@ -1011,7 +1007,16 @@ export default function CreateInvoice() {
                 variant="outlined"
               />
             </Box>
-
+            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+              <TextField
+                fullWidth
+                label="Retail Price"
+                type="number"
+                value={item.retailPrice}
+                InputProps={{ readOnly: true }}
+                variant="outlined"
+              />
+            </Box>
             <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
               <TextField
                 fullWidth
@@ -1112,7 +1117,7 @@ export default function CreateInvoice() {
             <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
               <TextField
                 fullWidth
-                label="Discount"
+                label="Discount (%)"
                 type="number"
                 value={item.discount}
                 onChange={(e) =>

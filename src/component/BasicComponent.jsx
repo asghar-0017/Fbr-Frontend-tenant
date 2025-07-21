@@ -28,7 +28,7 @@ import PrintIcon from "@mui/icons-material/Print";
 import { green } from "@mui/material/colors";
 import CloseIcon from "@mui/icons-material/Close";
 import IconButton from "@mui/material/IconButton";
-import API_CONFIG from "../API/Api";
+import {API_CONFIG} from "../API/Api";
 import SearchIcon from '@mui/icons-material/Search';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import SentimentDissatisfiedIcon from '@mui/icons-material/SentimentDissatisfied';

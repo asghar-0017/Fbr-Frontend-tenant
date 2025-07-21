@@ -12,6 +12,7 @@ import OTP from "../pages/OTP";
 import ResetPassword from "../pages/ResetPassword";
 import RegisterUser from "../pages/RegisterUser";
 import { RegisteredUsers } from "../pages/RegisteredUsers";
+import Buyers from "../pages/Buyers";
 // import ProductionForm from "../pages/productionForm"
 
 const SidebarWithLogout = () => {
@@ -40,6 +41,7 @@ const AppRouter = () => {
             <Route path="your-invoices" element={<YourInvoices />} />
             <Route path="register-buyer" element={<RegisterUser />} />
             <Route path="registered-users" element={<RegisteredUsers />} />
+            <Route path="buyers" element={<Buyers />} />
             {/* <Route path="productoin-invoice" element={<ProductionForm />} /> */}
           </Route>
         </Routes>

@@ -9,7 +9,7 @@ import {
   Stack,
   MenuItem,
 } from "@mui/material";
-import API_CONFIG from "../API/Api";
+import {API_CONFIG} from "../API/Api";
 import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
 
