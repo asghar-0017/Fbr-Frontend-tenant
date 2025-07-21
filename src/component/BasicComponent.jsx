@@ -50,7 +50,7 @@ export default function BasicTable() {
   const getMyInvoices = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("http://45.55.137.96:5150/get-invoice-data", {
+      const res = await axios.get("https://einvoice.inplsoftwares.online/get-invoice-data", {
         headers: {
           Authorization: `Bearer ${sandBoxTestToken}`,
         },
@@ -69,7 +69,7 @@ export default function BasicTable() {
 
   const handleButtonClick = async (id) => {
     try {
-      const link = `http://45.55.137.96:5150/print-invoice/${id}`;
+      const link = `https://einvoice.inplsoftwares.online/print-invoice/${id}`;
       window.open(link, "_blank");
     } catch (error) {
       console.error("Error printing invoice:", error);
@@ -80,7 +80,7 @@ export default function BasicTable() {
   const handleViewInvoice = async (id) => {
     try {
       const view = await axios.get(
-        `http://45.55.137.96:5150/get-invoice-data/${id}`
+        `https://einvoice.inplsoftwares.online/get-invoice-data/${id}`
       );
       setSelectedInvoice(view.data.data);
       setViewModalOpen(true);
