@@ -504,7 +504,7 @@ export default function CreateInvoice() {
             postRes.data.validationResponse.statusCode === "00"
           ) {
             const createInvoiceResponse = await axios.post(
-              "https://einvoice.inplsoftwares.online/create-invoice",
+              `${apiKeyLocal}/create-invoice`,
               {
                 ...cleanedData,
                 invoiceNumber: postRes.data.invoiceNumber,

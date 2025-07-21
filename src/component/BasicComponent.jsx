@@ -34,7 +34,7 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import SentimentDissatisfiedIcon from '@mui/icons-material/SentimentDissatisfied';
 import Tooltip from '@mui/material/Tooltip';
 
-const { apiKey,sandBoxTestToken } = API_CONFIG;
+const { apiKey,sandBoxTestToken,apiKeyLocal } = API_CONFIG;
 export default function BasicTable() {
   const [invoices, setInvoices] = useState([]);
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -50,7 +50,7 @@ export default function BasicTable() {
   const getMyInvoices = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("https://einvoice.inplsoftwares.online/get-invoice-data", {
+      const res = await axios.get(`${apiKeyLocal}/get-invoice-data`, {
         headers: {
           Authorization: `Bearer ${sandBoxTestToken}`,
         },
@@ -69,7 +69,7 @@ export default function BasicTable() {
 
   const handleButtonClick = async (id) => {
     try {
-      const link = `https://einvoice.inplsoftwares.online/print-invoice/${id}`;
+      const link = `${apiKeyLocal}/print-invoice/${id}`;
       window.open(link, "_blank");
     } catch (error) {
       console.error("Error printing invoice:", error);
@@ -80,7 +80,7 @@ export default function BasicTable() {
   const handleViewInvoice = async (id) => {
     try {
       const view = await axios.get(
-        `https://einvoice.inplsoftwares.online/get-invoice-data/${id}`
+        `${apiKeyLocal}/get-invoice-data/${id}`
       );
       setSelectedInvoice(view.data.data);
       setViewModalOpen(true);
