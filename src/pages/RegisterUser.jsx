@@ -77,12 +77,26 @@ const RegisterUser = () => {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(
-          data.message || "Registration failed. Please try again."
-        );
+        // Handle specific error cases with human-readable messages
+        if (data.message && data.message.includes("already exists")) {
+          throw new Error("A buyer with this NTN/CNIC already exists. Please use a different NTN/CNIC or contact support if this is an error.");
+        } else if (data.message && data.message.includes("validation")) {
+          throw new Error("Please check your input data. Some fields may be invalid or missing.");
+        } else if (data.message && data.message.includes("duplicate")) {
+          throw new Error("This buyer information already exists in our system. Please check the details and try again.");
+        } else if (res.status === 400) {
+          throw new Error(data.message || "Invalid data provided. Please check all fields and try again.");
+        } else if (res.status === 409) {
+          throw new Error("This buyer already exists in our system.");
+        } else if (res.status === 500) {
+          throw new Error("Server error occurred. Please try again later or contact support.");
+        } else {
+          throw new Error(data.message || "Registration failed. Please try again.");
+        }
       }
 
-      showSuccess("User registered successfully!");
+      showSuccess("Buyer registered successfully! The buyer has been added to your system.");
+      // Clear form only on success
       setForm({
         buyerNTNCNIC: "",
         buyerBusinessName: "",
@@ -92,6 +106,7 @@ const RegisterUser = () => {
       });
     } catch (err) {
       showError(err.message);
+      // Don't clear form on error - let user fix the issue
     } finally {
       setLoading(false);
     }

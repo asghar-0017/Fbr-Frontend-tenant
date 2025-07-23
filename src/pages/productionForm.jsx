@@ -50,21 +50,21 @@ export default function ProductionFoam() {
         productDescription: "",
         rate: "",
         uoM: "",
-        quantity: 1,
-        totalValues: 0,
-        valueSalesExcludingST: 0,
-        fixedNotifiedValueOrRetailPrice: 1,
-        salesTaxApplicable: 0,
-        salesTaxWithheldAtSource: 0,
+        quantity: "1",
+        totalValues: "0",
+        valueSalesExcludingST: "0",
+        fixedNotifiedValueOrRetailPrice: "1",
+        salesTaxApplicable: "0",
+        salesTaxWithheldAtSource: "0",
         sroScheduleNo: "",
         sroItemSerialNo: "",
         saleType: "",
         isSROScheduleEnabled: false,
         isSROItemEnabled: false,
         extraTax: "",
-        furtherTax: 0,
-        fedPayable: 0,
-        discount: 0,
+        furtherTax: "0",
+        fedPayable: "0",
+        discount: "0",
         isValueSalesManual: false,
       },
     ],
@@ -156,7 +156,7 @@ export default function ProductionFoam() {
       const parseValue = (val, isFloat = true) =>
         val === "" ? (isFloat ? 0 : "") : isFloat ? parseFloat(val) || 0 : val;
   
-      // Update the field
+      // Update the field - store the raw string value for display
       if (
         [
           "quantity",
@@ -171,7 +171,8 @@ export default function ProductionFoam() {
           "discount",
         ].includes(field)
       ) {
-        item[field] = parseValue(value, field !== "extraTax");
+        // Store the raw string value for display
+        item[field] = value;
         if (field === "valueSalesExcludingST") {
           item.isValueSalesManual = true;
         }
@@ -200,52 +201,54 @@ export default function ProductionFoam() {
         const rate = parseFloat((item.rate || "0").replace("%", "")) || 0;
 
         // Value without sales tax is just the unit cost
-        item.valueSalesExcludingST = unitCost;
+        item.valueSalesExcludingST = unitCost.toString();
 
         // Sales tax
         let rateFraction = 0;
         if (item.rate && item.rate.toLowerCase() !== "exempt" && item.rate !== "0%") {
           rateFraction = rate / 100;
-          item.salesTaxApplicable = Number((item.valueSalesExcludingST * rateFraction).toFixed(2));
+          const salesTax = Number((unitCost * rateFraction).toFixed(2));
+          item.salesTaxApplicable = salesTax.toString();
         } else {
-          item.salesTaxApplicable = 0;
-          item.salesTaxWithheldAtSource = 0;
+          item.salesTaxApplicable = "0";
+          item.salesTaxWithheldAtSource = "0";
         }
 
         // Total before discount
         let totalBeforeDiscount =
-          Number(item.valueSalesExcludingST) +
-          Number(item.salesTaxApplicable) +
-          Number(item.furtherTax) +
-          Number(item.fedPayable) +
-          Number(item.extraTax);
+          parseFloat(item.valueSalesExcludingST || 0) +
+          parseFloat(item.salesTaxApplicable || 0) +
+          parseFloat(item.furtherTax || 0) +
+          parseFloat(item.fedPayable || 0) +
+          parseFloat(item.extraTax || 0);
 
         // Discount as percentage
-        let discountPercent = Number(item.discount) || 0;
+        let discountPercent = parseFloat(item.discount || 0);
         let discountAmount = 0;
         if (discountPercent > 0) {
           discountAmount = (totalBeforeDiscount * discountPercent) / 100;
         }
-        item.totalValues = Number((totalBeforeDiscount - discountAmount).toFixed(2));
+        const totalValue = Number((totalBeforeDiscount - discountAmount).toFixed(2));
+        item.totalValues = totalValue.toString();
       }
   
-      // Parse extra fields always as numbers
-      item.extraTax = parseInt(item.extraTax, 10) || 0;
-      item.furtherTax = Number(item.furtherTax) || 0;
-      item.fedPayable = Number(item.fedPayable) || 0;
-      item.discount = Number(item.discount) || 0;
-  
+            // Parse extra fields always as numbers for calculations
+      const extraTaxNum = parseInt(item.extraTax, 10) || 0;
+      const furtherTaxNum = parseFloat(item.furtherTax || 0);
+      const fedPayableNum = parseFloat(item.fedPayable || 0);
+      const discountNum = parseFloat(item.discount || 0);
+
       // Calculate totals
-      item.totalValues =
-        Number(item.valueSalesExcludingST) +
-        Number(item.salesTaxApplicable) +
-        Number(item.furtherTax) +
-        Number(item.fedPayable) +
-        Number(item.extraTax) -
-        Number(item.discount);
-  
-      item.totalValues = Number(item.totalValues.toFixed(2));
-      item.salesTaxApplicable = Number(item.salesTaxApplicable.toFixed(2));
+      const totalValue =
+        parseFloat(item.valueSalesExcludingST || 0) +
+        parseFloat(item.salesTaxApplicable || 0) +
+        furtherTaxNum +
+        fedPayableNum +
+        extraTaxNum -
+        discountNum;
+
+      item.totalValues = Number(totalValue.toFixed(2)).toString();
+      item.salesTaxApplicable = Number(parseFloat(item.salesTaxApplicable || 0).toFixed(2)).toString();
   
       updatedItems[index] = item;
       return { ...prev, items: updatedItems };
@@ -262,18 +265,18 @@ export default function ProductionFoam() {
           productDescription: "",
           rate: "",
           uoM: "",
-          quantity: 1,
-          totalValues: 0,
-          valueSalesExcludingST: 0,
-          fixedNotifiedValueOrRetailPrice: 1,
-          salesTaxApplicable: 0,
-          salesTaxWithheldAtSource: 0,
+          quantity: "1",
+          totalValues: "0",
+          valueSalesExcludingST: "0",
+          fixedNotifiedValueOrRetailPrice: "1",
+          salesTaxApplicable: "0",
+          salesTaxWithheldAtSource: "0",
           sroScheduleNo: "",
           sroItemSerialNo: "",
           extraTax: "",
-          furtherTax: 0,
-          fedPayable: 0,
-          discount: 0,
+          furtherTax: "0",
+          fedPayable: "0",
+          discount: "0",
           saleType: "Goods at Standard Rate (default)",
           isSROScheduleEnabled: false,
           isSROItemEnabled: false,
@@ -855,15 +858,19 @@ export default function ProductionFoam() {
               <TextField
                 fullWidth
                 label="Unit Cost"
-                type="number"
+                type="text"
                 value={item.fixedNotifiedValueOrRetailPrice}
-                onChange={(e) =>
-                  handleItemChange(
-                    index,
-                    "fixedNotifiedValueOrRetailPrice",
-                    e.target.value
-                  )
-                }
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(
+                      index,
+                      "fixedNotifiedValueOrRetailPrice",
+                      value
+                    );
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -872,11 +879,15 @@ export default function ProductionFoam() {
               <TextField
                 fullWidth
                 label="Qty"
-                type="number"
+                type="text"
                 value={item.quantity}
-                onChange={(e) =>
-                  handleItemChange(index, "quantity", e.target.value)
-                }
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers
+                  if (value === '' || /^\d*$/.test(value)) {
+                    handleItemChange(index, "quantity", value);
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -885,15 +896,19 @@ export default function ProductionFoam() {
               <TextField
                 fullWidth
                 label="Value Sales (Excl. ST)"
-                type="number"
+                type="text"
                 value={item.valueSalesExcludingST}
-                onChange={(e) =>
-                  handleItemChange(
-                    index,
-                    "valueSalesExcludingST",
-                    e.target.value
-                  )
-                }
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(
+                      index,
+                      "valueSalesExcludingST",
+                      value
+                    );
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -902,11 +917,15 @@ export default function ProductionFoam() {
               <TextField
                 fullWidth
                 label="Sales Tax Applicable"
-                type="number"
+                type="text"
                 value={item.salesTaxApplicable}
-                onChange={(e) =>
-                  handleItemChange(index, "salesTaxApplicable", e.target.value)
-                }
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(index, "salesTaxApplicable", value);
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -915,11 +934,15 @@ export default function ProductionFoam() {
               <TextField
                 fullWidth
                 label="Total Values"
-                type="number"
+                type="text"
                 value={item.totalValues}
-                onChange={(e) =>
-                  handleItemChange(index, "totalValues", e.target.value)
-                }
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(index, "totalValues", value);
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -930,15 +953,19 @@ export default function ProductionFoam() {
               <TextField
                 fullWidth
                 label="ST Withheld at Source"
-                type="number"
+                type="text"
                 value={item.salesTaxWithheldAtSource}
-                onChange={(e) =>
-                  handleItemChange(
-                    index,
-                    "salesTaxWithheldAtSource",
-                    e.target.value
-                  )
-                }
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(
+                      index,
+                      "salesTaxWithheldAtSource",
+                      value
+                    );
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -946,11 +973,15 @@ export default function ProductionFoam() {
               <TextField
                 fullWidth
                 label="Extra Tax"
-                type="number"
+                type="text"
                 value={item.extraTax}
-                onChange={(e) =>
-                  handleItemChange(index, "extraTax", e.target.value)
-                }
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(index, "extraTax", value);
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -958,11 +989,15 @@ export default function ProductionFoam() {
               <TextField
                 fullWidth
                 label="Further Tax"
-                type="number"
+                type="text"
                 value={item.furtherTax}
-                onChange={(e) =>
-                  handleItemChange(index, "furtherTax", e.target.value)
-                }
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(index, "furtherTax", value);
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -970,11 +1005,15 @@ export default function ProductionFoam() {
               <TextField
                 fullWidth
                 label="FED Payable"
-                type="number"
+                type="text"
                 value={item.fedPayable}
-                onChange={(e) =>
-                  handleItemChange(index, "fedPayable", e.target.value)
-                }
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(index, "fedPayable", value);
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -982,11 +1021,15 @@ export default function ProductionFoam() {
               <TextField
                 fullWidth
                 label="Discount"
-                type="number"
+                type="text"
                 value={item.discount}
-                onChange={(e) =>
-                  handleItemChange(index, "discount", e.target.value)
-                }
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(index, "discount", value);
+                  }
+                }}
                 variant="outlined"
               />
             </Box>

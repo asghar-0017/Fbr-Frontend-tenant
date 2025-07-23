@@ -126,6 +126,7 @@ export const RegisteredUsers = () => {
       fetchUsers();
     } catch (err) {
       Swal.fire("Error!", err.message, "error");
+      // Don't close modal on error - let user fix the issue
     } finally {
       setModalLoading(false);
     }

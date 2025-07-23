@@ -51,23 +51,28 @@ export default function CreateInvoice() {
         productDescription: "",
         rate: "",
         uoM: "",
-        quantity: 1,
-        unitPrice: 0, // NEW FIELD
-        retailPrice: 0, // RENAMED
-        totalValues: 0,
-        valueSalesExcludingST: 0,
-        salesTaxApplicable: 0,
-        salesTaxWithheldAtSource: 0,
+        quantity: "1",
+        unitPrice: "0", // NEW FIELD
+        retailPrice: "0", // RENAMED
+        totalValues: "0",
+        valueSalesExcludingST: "0",
+        salesTaxApplicable: "0",
+        salesTaxWithheldAtSource: "0",
         sroScheduleNo: "",
         sroItemSerialNo: "",
         saleType: "",
         isSROScheduleEnabled: false,
         isSROItemEnabled: false,
         extraTax: "",
-        furtherTax: 0,
-        fedPayable: 0,
-        discount: 0,
+        furtherTax: "0",
+        fedPayable: "0",
+        discount: "0",
         isValueSalesManual: false,
+        isTotalValuesManual: false,
+        isSalesTaxManual: false,
+        isSalesTaxWithheldManual: false,
+        isFurtherTaxManual: false,
+        isFedPayableManual: false,
       },
     ],
   });
@@ -158,11 +163,11 @@ export default function CreateInvoice() {
       const updatedItems = [...prev.items];
       const item = { ...updatedItems[index] };
 
-      // Utility to parse values
+      // Utility to parse values for calculations
       const parseValue = (val, isFloat = true) =>
         val === "" ? (isFloat ? 0 : "") : isFloat ? parseFloat(val) || 0 : val;
 
-      // Update the field
+      // Update the field - store the raw string value for display
       if (
         [
           "quantity",
@@ -178,9 +183,25 @@ export default function CreateInvoice() {
           "discount",
         ].includes(field)
       ) {
-        item[field] = parseValue(value, field !== "extraTax");
+        // Store the raw string value for display
+        item[field] = value;
         if (field === "valueSalesExcludingST") {
           item.isValueSalesManual = true;
+        }
+        if (field === "totalValues") {
+          item.isTotalValuesManual = true;
+        }
+        if (field === "salesTaxApplicable") {
+          item.isSalesTaxManual = true;
+        }
+        if (field === "salesTaxWithheldAtSource") {
+          item.isSalesTaxWithheldManual = true;
+        }
+        if (field === "furtherTax") {
+          item.isFurtherTaxManual = true;
+        }
+        if (field === "fedPayable") {
+          item.isFedPayableManual = true;
         }
       } else {
         item[field] = value;
@@ -210,41 +231,62 @@ export default function CreateInvoice() {
       if (!item.isValueSalesManual && !isThirdSchedule) {
         const unitPrice = parseFloat(item.unitPrice || 0);
         const quantity = parseFloat(item.quantity || 0);
-        item.retailPrice = unitPrice * quantity;
-        item.valueSalesExcludingST = item.retailPrice;
+        const retailPrice = unitPrice * quantity;
+        item.retailPrice = retailPrice.toString();
+        item.valueSalesExcludingST = retailPrice.toString();
 
-        const rate = parseFloat((item.rate || "0").replace("%", "")) || 0;
-        if (
-          item.rate &&
-          item.rate.toLowerCase() !== "exempt" &&
-          item.rate !== "0%"
-        ) {
-          const rateFraction = rate / 100;
-          item.salesTaxApplicable = Number(
-            (item.valueSalesExcludingST * rateFraction).toFixed(2)
-          );
-        } else {
-          item.salesTaxApplicable = 0;
+        // Only calculate sales tax if not manually entered
+        if (!item.isSalesTaxManual) {
+          const rate = parseFloat((item.rate || "0").replace("%", "")) || 0;
+          if (
+            item.rate &&
+            item.rate.toLowerCase() !== "exempt" &&
+            item.rate !== "0%"
+          ) {
+            const rateFraction = rate / 100;
+            const salesTax = Number((retailPrice * rateFraction).toFixed(2));
+            item.salesTaxApplicable = salesTax.toString();
+          } else {
+            item.salesTaxApplicable = "0";
+          }
+        }
+      } else if (item.isValueSalesManual && !isThirdSchedule) {
+        // If user manually entered value sales, only calculate sales tax if not manually entered
+        if (!item.isSalesTaxManual) {
+          const rate = parseFloat((item.rate || "0").replace("%", "")) || 0;
+          if (
+            item.rate &&
+            item.rate.toLowerCase() !== "exempt" &&
+            item.rate !== "0%"
+          ) {
+            const rateFraction = rate / 100;
+            const valueSales = parseFloat(item.valueSalesExcludingST || 0);
+            const salesTax = Number((valueSales * rateFraction).toFixed(2));
+            item.salesTaxApplicable = salesTax.toString();
+          } else {
+            item.salesTaxApplicable = "0";
+          }
         }
       }
 
-      // Always recalculate total value unless it is a 3rd schedule item
-      if (!isThirdSchedule) {
-        const totalBeforeDiscount =
-          Number(item.valueSalesExcludingST || 0) +
-          Number(item.salesTaxApplicable || 0) +
-          Number(item.furtherTax || 0) +
-          Number(item.fedPayable || 0) +
-          Number(item.extraTax || 0);
+      // Only recalculate total value if it's not manually entered and not a 3rd schedule item
+      if (!isThirdSchedule && !item.isTotalValuesManual) {
+        const calculatedTotalBeforeDiscount =
+          parseFloat(item.valueSalesExcludingST || 0) +
+          parseFloat(item.salesTaxApplicable || 0) +
+          parseFloat(item.furtherTax || 0) +
+          parseFloat(item.fedPayable || 0) +
+          parseFloat(item.extraTax || 0);
 
-        const discountPercent = Number(item.discount || 0);
-        const discountAmount = (totalBeforeDiscount * discountPercent) / 100;
+        const discountPercent = parseFloat(item.discount || 0);
+        const discountAmount = (calculatedTotalBeforeDiscount * discountPercent) / 100;
 
-        const totalAfterDiscount = totalBeforeDiscount - discountAmount;
+        const totalAfterDiscount = calculatedTotalBeforeDiscount - discountAmount;
 
-        const taxWithheld = Number(item.salesTaxWithheldAtSource || 0);
+        const taxWithheld = parseFloat(item.salesTaxWithheldAtSource || 0);
 
-        item.totalValues = Number((totalAfterDiscount + taxWithheld).toFixed(2));
+        const calculatedTotal = Number((totalAfterDiscount + taxWithheld).toFixed(2));
+        item.totalValues = calculatedTotal.toString();
       }
 
       updatedItems[index] = item;
@@ -266,23 +308,28 @@ export default function CreateInvoice() {
           productDescription: productDescription,
           rate: "",
           uoM: "",
-          quantity: 1,
-          unitPrice: 0, // NEW FIELD
-          retailPrice: 0, // RENAMED
-          totalValues: 0,
-          valueSalesExcludingST: 0,
-          salesTaxApplicable: 0,
-          salesTaxWithheldAtSource: 0,
+          quantity: "1",
+          unitPrice: "0", // NEW FIELD
+          retailPrice: "0", // RENAMED
+          totalValues: "0",
+          valueSalesExcludingST: "0",
+          salesTaxApplicable: "0",
+          salesTaxWithheldAtSource: "0",
           sroScheduleNo: "",
           sroItemSerialNo: "",
           extraTax: "",
-          furtherTax: 0,
-          fedPayable: 0,
-          discount: 0,
+          furtherTax: "0",
+          fedPayable: "0",
+          discount: "0",
           saleType,
           isSROScheduleEnabled: false,
           isSROItemEnabled: false,
           isValueSalesManual: false,
+          isTotalValuesManual: false,
+          isSalesTaxManual: false,
+          isSalesTaxWithheldManual: false,
+          isFurtherTaxManual: false,
+          isFedPayableManual: false,
         },
       ],
     }));
@@ -457,10 +504,15 @@ export default function CreateInvoice() {
       }
 
       const cleanedItems = formData.items.map(
-        ({ isSROScheduleEnabled, isSROItemEnabled, retailPrice, ...rest }) => ({
+        ({ isSROScheduleEnabled, isSROItemEnabled, retailPrice, isValueSalesManual, isTotalValuesManual, isSalesTaxManual, isSalesTaxWithheldManual, isFurtherTaxManual, isFedPayableManual, ...rest }) => ({
           ...rest,
           fixedNotifiedValueOrRetailPrice: Number(Number(retailPrice).toFixed(2)), // send as required by FBR
           quantity: rest.quantity === "" ? 0 : parseInt(rest.quantity, 10),
+          unitPrice: Number(rest.unitPrice) || 0,
+          valueSalesExcludingST: Number(rest.valueSalesExcludingST) || 0,
+          salesTaxApplicable: Number(Number(rest.salesTaxApplicable).toFixed(2)),
+          salesTaxWithheldAtSource: Number(rest.salesTaxWithheldAtSource) || 0,
+          totalValues: Number(Number(rest.totalValues).toFixed(2)),
           sroScheduleNo: rest.sroScheduleNo?.trim() || "N/A",
           sroItemSerialNo: rest.sroItemSerialNo?.trim() || "N/A",
           productDescription: rest.productDescription?.trim() || "N/A",
@@ -471,8 +523,6 @@ export default function CreateInvoice() {
           furtherTax: Number(rest.furtherTax) || 0,
           fedPayable: Number(rest.fedPayable) || 0,
           discount: Number(rest.discount) || 0,
-          salesTaxApplicable: Number(Number(rest.salesTaxApplicable).toFixed(2)),
-          totalValues: Number(Number(rest.totalValues).toFixed(2)),
         })
       );
 
@@ -987,11 +1037,15 @@ export default function CreateInvoice() {
               <TextField
                 fullWidth
                 label="Unit Price"
-                type="number"
-                value={item.unitPrice}
-                onChange={(e) =>
-                  handleItemChange(index, "unitPrice", e.target.value)
-                }
+                type="text"
+                value={item.unitPrice ? parseFloat(item.unitPrice).toString() : ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(index, "unitPrice", value);
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -999,11 +1053,15 @@ export default function CreateInvoice() {
               <TextField
                 fullWidth
                 label="Qty"
-                type="number"
-                value={item.quantity}
-                onChange={(e) =>
-                  handleItemChange(index, "quantity", e.target.value)
-                }
+                type="text"
+                value={item.quantity ? parseInt(item.quantity).toString() : ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers
+                  if (value === '' || /^\d*$/.test(value)) {
+                    handleItemChange(index, "quantity", value);
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -1011,8 +1069,8 @@ export default function CreateInvoice() {
               <TextField
                 fullWidth
                 label="Retail Price"
-                type="number"
-                value={item.retailPrice}
+                type="text"
+                value={item.retailPrice ? parseFloat(item.retailPrice).toString() : ""}
                 InputProps={{ readOnly: true }}
                 variant="outlined"
               />
@@ -1021,15 +1079,19 @@ export default function CreateInvoice() {
               <TextField
                 fullWidth
                 label="Value Sales (Excl. ST)"
-                type="number"
-                value={item.valueSalesExcludingST}
-                onChange={(e) =>
-                  handleItemChange(
-                    index,
-                    "valueSalesExcludingST",
-                    e.target.value
-                  )
-                }
+                type="text"
+                value={item.valueSalesExcludingST ? parseFloat(item.valueSalesExcludingST).toString() : ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(
+                      index,
+                      "valueSalesExcludingST",
+                      value
+                    );
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -1038,11 +1100,15 @@ export default function CreateInvoice() {
               <TextField
                 fullWidth
                 label="Sales Tax Applicable"
-                type="number"
-                value={item.salesTaxApplicable}
-                onChange={(e) =>
-                  handleItemChange(index, "salesTaxApplicable", e.target.value)
-                }
+                type="text"
+                value={item.salesTaxApplicable ? parseFloat(item.salesTaxApplicable).toString() : ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(index, "salesTaxApplicable", value);
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -1051,11 +1117,15 @@ export default function CreateInvoice() {
               <TextField
                 fullWidth
                 label="Total Values"
-                type="number"
-                value={item.totalValues}
-                onChange={(e) =>
-                  handleItemChange(index, "totalValues", e.target.value)
-                }
+                type="text"
+                value={item.totalValues ? parseFloat(item.totalValues).toString() : ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(index, "totalValues", value);
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -1066,15 +1136,19 @@ export default function CreateInvoice() {
               <TextField
                 fullWidth
                 label="ST Withheld at Source"
-                type="number"
-                value={item.salesTaxWithheldAtSource}
-                onChange={(e) =>
-                  handleItemChange(
-                    index,
-                    "salesTaxWithheldAtSource",
-                    e.target.value
-                  )
-                }
+                type="text"
+                value={item.salesTaxWithheldAtSource ? parseFloat(item.salesTaxWithheldAtSource).toString() : ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(
+                      index,
+                      "salesTaxWithheldAtSource",
+                      value
+                    );
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -1082,11 +1156,15 @@ export default function CreateInvoice() {
               <TextField
                 fullWidth
                 label="Extra Tax"
-                type="number"
-                value={item.extraTax}
-                onChange={(e) =>
-                  handleItemChange(index, "extraTax", e.target.value)
-                }
+                type="text"
+                value={item.extraTax ? parseFloat(item.extraTax).toString() : ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(index, "extraTax", value);
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -1094,11 +1172,15 @@ export default function CreateInvoice() {
               <TextField
                 fullWidth
                 label="Further Tax"
-                type="number"
-                value={item.furtherTax}
-                onChange={(e) =>
-                  handleItemChange(index, "furtherTax", e.target.value)
-                }
+                type="text"
+                value={item.furtherTax ? parseFloat(item.furtherTax).toString() : ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(index, "furtherTax", value);
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -1106,11 +1188,15 @@ export default function CreateInvoice() {
               <TextField
                 fullWidth
                 label="FED Payable"
-                type="number"
-                value={item.fedPayable}
-                onChange={(e) =>
-                  handleItemChange(index, "fedPayable", e.target.value)
-                }
+                type="text"
+                value={item.fedPayable ? parseFloat(item.fedPayable).toString() : ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(index, "fedPayable", value);
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
@@ -1118,11 +1204,15 @@ export default function CreateInvoice() {
               <TextField
                 fullWidth
                 label="Discount (%)"
-                type="number"
-                value={item.discount}
-                onChange={(e) =>
-                  handleItemChange(index, "discount", e.target.value)
-                }
+                type="text"
+                value={item.discount ? parseFloat(item.discount).toString() : ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal points
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    handleItemChange(index, "discount", value);
+                  }
+                }}
                 variant="outlined"
               />
             </Box>
