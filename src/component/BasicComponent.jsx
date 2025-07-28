@@ -28,13 +28,13 @@ import PrintIcon from "@mui/icons-material/Print";
 import { green } from "@mui/material/colors";
 import CloseIcon from "@mui/icons-material/Close";
 import IconButton from "@mui/material/IconButton";
-import {API_CONFIG} from "../API/Api";
+import { api } from "../API/Api";
 import SearchIcon from '@mui/icons-material/Search';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import SentimentDissatisfiedIcon from '@mui/icons-material/SentimentDissatisfied';
 import Tooltip from '@mui/material/Tooltip';
+import { useTenantSelection } from '../Context/TenantSelectionProvider';
 
-const { apiKey,sandBoxTestToken,apiKeyLocal } = API_CONFIG;
 export default function BasicTable() {
   const [invoices, setInvoices] = useState([]);
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -46,46 +46,109 @@ export default function BasicTable() {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [invoiceDate, setInvoiceDate] = useState(null);
   const theme = useTheme();
+  const { selectedTenant } = useTenantSelection();
 
   const getMyInvoices = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${apiKeyLocal}/get-invoice-data`, {
-        headers: {
-          Authorization: `Bearer ${sandBoxTestToken}`,
-        },
-      });
-      setInvoices(res.data.data);
+      if (!selectedTenant) {
+        console.error("No tenant selected");
+        setLoading(false);
+        return;
+      }
+
+      const response = await api.get(`/tenant/${selectedTenant.tenant_id}/invoices`);
+      
+      if (response.data.success) {
+        setInvoices(response.data.data.invoices || []);
+      } else {
+        console.error("Failed to fetch invoices:", response.data.message);
+        setInvoices([]);
+      }
     } catch (error) {
       console.error("Error fetching invoices:", error);
+      if (error.response?.status === 401) {
+        alert("Authentication failed. Please log in again.");
+      }
+      setInvoices([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    getMyInvoices();
-  }, []);
+    if (selectedTenant) {
+      getMyInvoices();
+    }
+  }, [selectedTenant]);
 
-  const handleButtonClick = async (id) => {
+  const handleButtonClick = async (invoice) => {
     try {
-      const link = `${apiKeyLocal}/print-invoice/${id}`;
-      window.open(link, "_blank");
+      if (!selectedTenant) {
+        alert("No tenant selected");
+        return;
+      }
+      
+      // Get the auth token
+      const token = localStorage.getItem('tenantToken') || localStorage.getItem('token');
+      if (!token) {
+        alert("Authentication token not found");
+        return;
+      }
+      
+      // Create a new window with the print URL
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert("Please allow popups to print invoices");
+        return;
+      }
+      
+      // Make an authenticated request to get the print content
+      const response = await api.get(`/tenant/${selectedTenant.tenant_id}/invoices/${invoice.id}/print`, {
+        responseType: 'text'
+      });
+      
+      // Write the HTML content to the new window
+      printWindow.document.write(response.data);
+      printWindow.document.close();
+      
+      // Wait for content to load then print
+      setTimeout(() => {
+        printWindow.print();
+      }, 1000);
     } catch (error) {
       console.error("Error printing invoice:", error);
-      alert("Error printing invoice. Check console for details.");
+      if (error.response?.status === 401) {
+        alert("Authentication failed. Please log in again.");
+      } else {
+        alert("Error printing invoice. Check console for details.");
+      }
     }
   };
 
-  const handleViewInvoice = async (id) => {
+  const handleViewInvoice = async (invoice) => {
     try {
-      const view = await axios.get(
-        `${apiKeyLocal}/get-invoice-data/${id}`
-      );
-      setSelectedInvoice(view.data.data);
-      setViewModalOpen(true);
+      if (!selectedTenant) {
+        alert("No tenant selected");
+        return;
+      }
+
+      const response = await api.get(`/tenant/${selectedTenant.tenant_id}/invoices/${invoice.id}`);
+      
+      if (response.data.success) {
+        setSelectedInvoice(response.data.data);
+        setViewModalOpen(true);
+      } else {
+        console.error("Failed to fetch invoice:", response.data.message);
+        alert("Failed to fetch invoice details");
+      }
     } catch (error) {
       console.error("Error fetching invoice data:", error);
+      if (error.response?.status === 401) {
+        alert("Authentication failed. Please log in again.");
+      } else {
+        alert("Error fetching invoice details. Check console for details.");
+      }
     }
   };
 
@@ -114,7 +177,27 @@ export default function BasicTable() {
 
   return (
     <>
-      {loading ? (
+      {!selectedTenant ? (
+        <Box
+          sx={{
+            textAlign: "center",
+            p: 4,
+            height: "100vh",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: theme.palette.background.default,
+          }}
+        >
+          <Typography variant="h5" color="text.secondary" gutterBottom>
+            No Tenant Selected
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Please select a tenant to view invoices.
+          </Typography>
+        </Box>
+      ) : loading ? (
         <Box
           sx={{
             textAlign: "center",
@@ -269,13 +352,13 @@ export default function BasicTable() {
                         {row.scenarioId || "N/A"}
                       </TableCell>
                       <TableCell align="right">
-                        {row.items.map((item) => item.hsCode).join(", ") || "N/A"}
+                        {row.items && row.items.length > 0 ? row.items.map((item) => item.hsCode || "N/A").join(", ") : "N/A"}
                       </TableCell>
                       <TableCell align="right">
                         <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
                           <Tooltip title="Print Invoice">
                             <Button
-                              onClick={() => handleButtonClick(row.invoiceNumber)}
+                              onClick={() => handleButtonClick(row)}
                               variant="outlined"
                               size="small"
                               startIcon={<PrintIcon />}
@@ -301,7 +384,7 @@ export default function BasicTable() {
                           </Tooltip>
                           <Tooltip title="View Invoice Details">
                             <Button
-                              onClick={() => handleViewInvoice(row.invoiceNumber)}
+                              onClick={() => handleViewInvoice(row)}
                               variant="outlined"
                               size="small"
                               startIcon={<VisibilityIcon />}
@@ -427,7 +510,7 @@ export default function BasicTable() {
                         <br />
                         <b>Date:</b> {selectedInvoice.invoiceDate}
                         <br />
-                        <b>Scenario ID:</b> {selectedInvoice.scenarioId}
+                        <b>Scenario ID:</b> {selectedInvoice.scenarioId || "N/A"}
                       </Typography>
                     </Box>
 
@@ -494,7 +577,7 @@ export default function BasicTable() {
                       >
                         Items
                       </Typography>
-                      {selectedInvoice.items.map((item, index) => (
+                      {(selectedInvoice.items || []).map((item, index) => (
                         <Box
                           key={index}
                           sx={(theme) => ({

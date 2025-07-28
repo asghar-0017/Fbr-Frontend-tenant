@@ -19,20 +19,19 @@ import ListItemText from "@mui/material/ListItemText";
 import InboxIcon from "@mui/icons-material/MoveToInbox";
 import MailIcon from "@mui/icons-material/Mail";
 import CreateInvoice from "../pages/createInvoiceForm";
-import { href, NavLink, Outlet, Route, Routes } from "react-router-dom";
+import { href, NavLink, Outlet, Route, Routes, useNavigate } from "react-router-dom";
 import YourInvoices from "../pages/YourInvoices";
 import LogoutIcon from "@mui/icons-material/Logout";
-import { Button } from "@mui/material";
+import { Button, Chip } from "@mui/material";
+import { useAuth } from "../Context/AuthProvider";
+import { useTenantSelection } from "../Context/TenantSelectionProvider";
+import {
+  Business as BusinessIcon,
+  People as PeopleIcon,
+  Receipt as ReceiptIcon,
+  Assignment as AssignmentIcon
+} from "@mui/icons-material";
 // import productionForm  from "../pages/productionForm"
-
-const navItems = [
-  { name: "SandBox Invoice form", href: "/" },
-  { name: "Your Invoices", href: "/your-invoices" },
-  // { name: "Register Buyer", href: "/register-buyer" },
-  { name: "Buyers", href: "/buyers" },
-  // { name: "production Invoice Form", href: "/prod  uctoin-invoice" },
-  { name: "logout" },
-];
 
 const drawerWidth = 240;
 
@@ -94,6 +93,27 @@ const DrawerHeader = styled("div")(({ theme }) => ({
 export default function Sidebar({ onLogout }) {
   const theme = useTheme();
   const [open, setOpen] = React.useState(false);
+  const { user } = useAuth();
+  const { selectedTenant, isTenantSelected } = useTenantSelection();
+  const navigate = useNavigate();
+
+  const navItems = [
+    { name: "SandBox Invoice form", href: "/", icon: <AssignmentIcon /> },
+    { name: "Your Invoices", href: "/your-invoices", icon: <ReceiptIcon /> },
+    { name: "Buyers", href: "/buyers", icon: <PeopleIcon /> },
+    // { name: "Register Buyer", href: "/register-buyer" },
+    // { name: "production Invoice Form", href: "/productoin-invoice" },
+    { name: "logout" },
+  ];
+
+  // Add tenant selection for admins
+  if (user?.role === 'admin') {
+    navItems.unshift({ 
+      name: "Select Tenant", 
+      href: "/tenant-management", 
+      icon: <BusinessIcon /> 
+    });
+  }
 
   const handleDrawerOpen = () => {
     setOpen(true);
@@ -129,6 +149,14 @@ export default function Sidebar({ onLogout }) {
           <Typography variant="h6" noWrap component="div">
             FBR Invoices
           </Typography>
+          {selectedTenant && (
+            <Chip 
+                              label={`Tenant: ${selectedTenant.sellerBusinessName}`}
+              color="primary"
+              variant="outlined"
+              sx={{ ml: 2 }}
+            />
+          )}
           <Box sx={{ flexGrow: 1 }} />
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <img src={'/images/innovative.png'} alt="Logo" style={{ maxHeight: 40, marginLeft: 16 }} />
@@ -180,7 +208,7 @@ export default function Sidebar({ onLogout }) {
                 <ListItem disablePadding>
                   <ListItemButton>
                     <ListItemIcon>
-                      {index % 2 === 0 ? <InboxIcon /> : <MailIcon />}
+                      {item.icon || (index % 2 === 0 ? <InboxIcon /> : <MailIcon />)}
                     </ListItemIcon>
                     <ListItemText primary={item.name} />
                   </ListItemButton>

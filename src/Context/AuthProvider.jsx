@@ -1,10 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import { API_CONFIG } from "../API/Api";
-
-const { apiKeyLocal } = API_CONFIG;
+import { api } from "../API/Api";
 
 const AuthContext = createContext();
 
@@ -19,7 +16,7 @@ export const AuthProvider = ({ children }) => {
     try {
       setAuthLoading(true);
       
-      const response = await axios.post(`${apiKeyLocal}/login`, {
+      const response = await api.post('/auth/login', {
         email,
         password,
       });
@@ -106,11 +103,7 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem("token");
       
       if (token) {
-        await axios.get(`${apiKeyLocal}/logout`, {
-          headers: {
-            authorization: `Bearer ${token}`,
-          },
-        });
+        await api.get('/auth/logout');
       }
     } catch (err) {
       console.error("Logout API error:", err);
@@ -144,11 +137,7 @@ export const AuthProvider = ({ children }) => {
         return false;
       }
 
-      const response = await axios.get(`${apiKeyLocal}/verify-token`, {
-        headers: {
-          authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await api.get('/auth/verify-token');
 
       if (response.data.success && response.data.data && response.data.data.isValid) {
         const userData = response.data.data.user;
@@ -179,11 +168,7 @@ export const AuthProvider = ({ children }) => {
         return null;
       }
 
-      const response = await axios.get(`${apiKeyLocal}/profile`, {
-        headers: {
-          authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await api.get('/auth/profile');
 
       if (response.data.success && response.data.data) {
         const userData = response.data.data.user;
@@ -207,11 +192,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error("No authentication token");
       }
 
-      const response = await axios.put(`${apiKeyLocal}/profile`, profileData, {
-        headers: {
-          authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await api.put('/auth/profile', profileData);
 
       if (response.data.success && response.data.data) {
         const userData = response.data.data.user;
@@ -257,13 +238,9 @@ export const AuthProvider = ({ children }) => {
         throw new Error("No authentication token");
       }
 
-      const response = await axios.put(`${apiKeyLocal}/change-password`, {
+      const response = await api.put('/auth/change-password', {
         currentPassword,
         newPassword
-      }, {
-        headers: {
-          authorization: `Bearer ${token}`,
-        },
       });
 
       if (response.data.success) {
@@ -301,7 +278,7 @@ export const AuthProvider = ({ children }) => {
 
   const forgotPassword = async (email) => {
     try {
-      const response = await axios.post(`${apiKeyLocal}/forgot-password`, {
+      const response = await api.post('/auth/forgot-password', {
         email
       });
 
@@ -338,7 +315,7 @@ export const AuthProvider = ({ children }) => {
 
   const verifyResetCode = async (email, code) => {
     try {
-      const response = await axios.post(`${apiKeyLocal}/verify-reset-code`, {
+      const response = await api.post('/auth/verify-reset-code', {
         email,
         code
       });
@@ -362,7 +339,7 @@ export const AuthProvider = ({ children }) => {
 
   const resetPassword = async (email, code, newPassword) => {
     try {
-      const response = await axios.put(`${apiKeyLocal}/reset-password`, {
+      const response = await api.put('/auth/reset-password', {
         email,
         code,
         newPassword

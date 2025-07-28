@@ -138,7 +138,7 @@ export default function BuyerTable({ buyers, loading, onEdit, onDelete, onAdd })
             ) : (
               paginatedBuyers.map((buyer, index) => (
                 <TableRow
-                  key={buyer._id || index}
+                  key={buyer.id || index}
                   sx={{
                     backgroundColor: index % 2 === 0 ? '#f5fafd' : '#e3f2fd',
                     '&:hover': { backgroundColor: '#bbdefb', transition: 'background-color 0.3s' },
@@ -169,7 +169,7 @@ export default function BuyerTable({ buyers, loading, onEdit, onDelete, onAdd })
                       Edit
                     </Button>
                     <Button
-                      onClick={() => onDelete(buyer._id)}
+                      onClick={() => onDelete(buyer.id)}
                       variant="outlined"
                       size="small"
                       sx={{ color: red[700], borderColor: red[700], '&:hover': { backgroundColor: red[700], color: 'white', borderColor: red[700] } }}

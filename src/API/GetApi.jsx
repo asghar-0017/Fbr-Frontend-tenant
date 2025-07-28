@@ -83,7 +83,7 @@ export const fetchData = async (endpoint) => {
   };
 
   try {
-    const res = await axios.get(`${apiKey}/${endpoint}`, config);
+    const res = await axios.get(`https://gw.fbr.gov.pk/${endpoint}`, config);
     return res.data;
   } catch (error) {
     console.error("API Error:", {

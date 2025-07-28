@@ -26,17 +26,22 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {API_CONFIG} from "../API/Api";
+import TenantSelectionPrompt from "../component/TenantSelectionPrompt";
+import { useTenantSelection } from "../Context/TenantSelectionProvider";
+import TenantDashboard from "../component/TenantDashboard";
 
 const { apiKeyLocal, sandBoxTestToken } = API_CONFIG;
 
 export default function ProductionFoam() {
+  const { selectedTenant } = useTenantSelection();
+  
   const [formData, setFormData] = React.useState({
     invoiceType: "",
     invoiceDate: dayjs(),
-    sellerNTNCNIC: "6386420",
-    sellerBusinessName: "Asghar Ali",
-    sellerProvince: "SINDH",
-    sellerAddress: "Innovative Solutions, Karachi",
+    sellerNTNCNIC: "",
+    sellerBusinessName: "",
+    sellerProvince: "",
+    sellerAddress: "",
     buyerNTNCNIC: "",
     buyerBusinessName: "",
     buyerProvince: "",
@@ -88,6 +93,28 @@ export default function ProductionFoam() {
     }));
   };
 
+  // Update form data when selected tenant changes
+  React.useEffect(() => {
+    if (selectedTenant) {
+      setFormData(prev => ({
+        ...prev,
+        sellerNTNCNIC: selectedTenant.sellerNTNCNIC || "",
+        sellerBusinessName: selectedTenant.sellerBusinessName || "",
+        sellerProvince: selectedTenant.sellerProvince || "",
+        sellerAddress: selectedTenant.sellerAddress || "",
+      }));
+    } else {
+      // Clear seller fields if no tenant is selected
+      setFormData(prev => ({
+        ...prev,
+        sellerNTNCNIC: "",
+        sellerBusinessName: "",
+        sellerProvince: "",
+        sellerAddress: "",
+      }));
+    }
+  }, [selectedTenant]);
+
   React.useEffect(() => {
     setAllLoading(true);
     Promise.allSettled([
@@ -134,7 +161,7 @@ export default function ProductionFoam() {
 
   useEffect(() => {
     if (!selectedBuyerId) return;
-    const buyer = buyers.find((b) => b._id === selectedBuyerId);
+    const buyer = buyers.find((b) => b.id === selectedBuyerId);
     if (buyer) {
       setFormData((prev) => ({
         ...prev,
@@ -311,6 +338,39 @@ export default function ProductionFoam() {
   const handleSubmitChange = async () => {
     setLoading(true);
     try {
+      // Validate that a tenant is selected and seller information is populated
+      if (!selectedTenant) {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Please select a tenant before creating an invoice.",
+          confirmButtonColor: "#d33",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Validate seller fields
+      const sellerRequiredFields = [
+        { field: "sellerNTNCNIC", label: "Seller NTN/CNIC" },
+        { field: "sellerBusinessName", label: "Seller Business Name" },
+        { field: "sellerProvince", label: "Seller Province" },
+        { field: "sellerAddress", label: "Seller Address" },
+      ];
+
+      for (const { field, label } of sellerRequiredFields) {
+        if (!formData[field] || formData[field].trim() === "") {
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: `${label} is required. Please select a tenant to populate seller information.`,
+            confirmButtonColor: "#d33",
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
       for (const [index, item] of formData.items.entries()) {
         const itemRequiredFields = [
           {
@@ -379,9 +439,7 @@ export default function ProductionFoam() {
           sroItemSerialNo: rest.sroItemSerialNo?.trim() || "",
           productDescription: rest.productDescription?.trim() || "N/A",
           saleType: rest.saleType?.trim() || "Goods at standard rate (default)",
-          extraTax: (rest.extraTax !== undefined && rest.extraTax !== null && rest.extraTax !== "" && Number(rest.extraTax) !== 0)
-            ? parseInt(rest.extraTax, 10)
-            : "",
+          extraTax: Number(rest.extraTax) || 0,
           furtherTax: Number(rest.furtherTax) || 0,
           fedPayable: Number(rest.fedPayable) || 0,
           discount: Number(rest.discount) || 0,
@@ -482,18 +540,20 @@ export default function ProductionFoam() {
   };
 
   return (
-    <Box
-      sx={{
-        p: { xs: 2, sm: 4 },
-        background: "linear-gradient(135deg, #f8fafc 0%, #e0e7ef 100%)",
-        borderRadius: 4,
-        mt: 8,
-        boxShadow: 6,
-        maxWidth: 1200,
-        mx: "auto",
-        mb: 6,
-      }}
-    >
+    <TenantSelectionPrompt>
+      {selectedTenant && <TenantDashboard />}
+      <Box
+        sx={{
+          p: { xs: 2, sm: 4 },
+          background: "linear-gradient(135deg, #f8fafc 0%, #e0e7ef 100%)",
+          borderRadius: 4,
+          mt: selectedTenant ? 2 : 8,
+          boxShadow: 6,
+          maxWidth: 1200,
+          mx: "auto",
+          mb: 6,
+        }}
+      >
       {/* Invoice Type Section */}
       <Box
         sx={{
@@ -576,13 +636,47 @@ export default function ProductionFoam() {
       >
         Seller Detail
       </Typography>
+      
+      {/* Tenant Selection Status */}
+      {selectedTenant ? (
+        <Box sx={{ mb: 2, p: 2, bgcolor: 'success.light', borderRadius: 2, color: 'white' }}>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            ✓ Selected Tenant: {selectedTenant.sellerBusinessName} ({selectedTenant.sellerNTNCNIC})
+          </Typography>
+          <Typography variant="caption" sx={{ opacity: 0.9 }}>
+            Seller information has been automatically populated from the selected tenant.
+          </Typography>
+        </Box>
+      ) : (
+        <Box sx={{ mb: 2, p: 2, bgcolor: 'warning.light', borderRadius: 2, color: 'white' }}>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            ⚠ Please select a tenant to populate seller information
+          </Typography>
+          <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 1 }}>
+            Go to Tenant Management to select a tenant before creating an invoice.
+          </Typography>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={() => navigate('/tenant-management')}
+            sx={{ 
+              bgcolor: 'white', 
+              color: 'warning.main',
+              '&:hover': { bgcolor: 'grey.100' }
+            }}
+          >
+            Select Tenant
+          </Button>
+        </Box>
+      )}
+      
       <Box
         sx={{
           border: "1px solid #e3e8ee",
           borderRadius: 3,
           p: { xs: 2, sm: 3 },
           mb: 4,
-          background: "#f7fafd",
+          background: selectedTenant ? "#f7fafd" : "#fff5f5",
           boxShadow: 1,
           transition: "box-shadow 0.2s",
           "&:hover": { boxShadow: 4 },
@@ -616,6 +710,14 @@ export default function ProductionFoam() {
                 onChange={(e) => handleChange("sellerProvince", e.target.value)}
                 disabled={true}
               >
+                {/* Add tenant's province if it's not in the FBR list */}
+                {selectedTenant && selectedTenant.sellerProvince && 
+                 !province.find(p => p.stateProvinceDesc === selectedTenant.sellerProvince) && (
+                  <MenuItem value={selectedTenant.sellerProvince}>
+                    {selectedTenant.sellerProvince} (Custom)
+                  </MenuItem>
+                )}
+                {/* Standard FBR provinces */}
                 {province.map((prov) => (
                   <MenuItem
                     key={prov.stateProvinceCode}
@@ -664,16 +766,16 @@ export default function ProductionFoam() {
                   ? `${option.buyerBusinessName} (${option.buyerNTNCNIC})`
                   : ""
               }
-              value={buyers.find((b) => b._id === selectedBuyerId) || null}
+              value={buyers.find((b) => b.id === selectedBuyerId) || null}
               onChange={(_, newValue) =>
-                setSelectedBuyerId(newValue ? newValue._id : "")
+                setSelectedBuyerId(newValue ? newValue.id : "")
               }
               renderInput={(params) => (
                 <TextField {...params} label="Select Buyer" variant="outlined" />
               )}
-              isOptionEqualToValue={(option, value) => option._id === value._id}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
               getOptionKey={(option) =>
-                option._id ||
+                option.id ||
                 option.buyerNTNCNIC ||
                 option.buyerBusinessName ||
                 option.buyerAddress ||
@@ -682,6 +784,67 @@ export default function ProductionFoam() {
             />
           </Box>
         </Box>
+        
+        {/* Buyer Details Fields - Only show when a buyer is selected */}
+        {selectedBuyerId && (
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3, mt: 3 }}>
+            {[
+              { label: "Buyer NTN/CNIC", field: "buyerNTNCNIC" },
+              { label: "Buyer Business Name", field: "buyerBusinessName" },
+              { label: "Buyer Address", field: "buyerAddress" },
+            ].map(({ label, field }) => (
+              <Box key={field} sx={{ flex: "1 1 30%", minWidth: "250px" }}>
+                <TextField
+                  fullWidth
+                  label={label}
+                  value={formData[field]}
+                  onChange={(e) => handleChange(field, e.target.value)}
+                  variant="outlined"
+                  disabled={true}
+                />
+              </Box>
+            ))}
+
+            <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
+              <FormControl fullWidth>
+                <InputLabel id="buyer-province-label">Buyer Province</InputLabel>
+                <Select
+                  labelId="buyer-province-label"
+                  value={formData.buyerProvince}
+                  label="Buyer Province"
+                  onChange={(e) => handleChange("buyerProvince", e.target.value)}
+                  disabled={true}
+                >
+                  {province.map((prov) => (
+                    <MenuItem
+                      key={prov.stateProvinceCode}
+                      value={prov.stateProvinceDesc}
+                    >
+                      {prov.stateProvinceDesc}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+
+            <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
+              <FormControl fullWidth>
+                <InputLabel id="buyer-registration-type-label">Buyer Registration Type</InputLabel>
+                <Select
+                  labelId="buyer-registration-type-label"
+                  value={formData.buyerRegistrationType}
+                  label="Buyer Registration Type"
+                  onChange={(e) => handleChange("buyerRegistrationType", e.target.value)}
+                  disabled={true}
+                >
+                  <MenuItem value="Registered">Registered</MenuItem>
+                  <MenuItem value="Unregistered">Unregistered</MenuItem>
+                  <MenuItem value="Consumer">Consumer</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+          </Box>
+        )}
       </Box>
       {/* Transaction Type Section */}
       <Typography
@@ -1120,6 +1283,6 @@ export default function ProductionFoam() {
         </Box>
       )}
     </Box>
-  )
-}
+    </TenantSelectionPrompt>
+  );
 }

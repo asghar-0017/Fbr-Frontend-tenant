@@ -5,8 +5,11 @@ import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import BuyerTable from '../component/BuyerTable';
 import { Button } from '@mui/material';
+import TenantSelectionPrompt from '../component/TenantSelectionPrompt';
+import { useTenantSelection } from '../Context/TenantSelectionProvider';
 
 const Buyers = () => {
+  const { selectedTenant } = useTenantSelection();
   const [buyers, setBuyers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,15 +28,24 @@ const Buyers = () => {
 
   const handleSave = async (buyerData) => {
     try {
+      // Use the standardized field names directly
+      const transformedData = {
+        buyerNTNCNIC: buyerData.buyerNTNCNIC,
+        buyerBusinessName: buyerData.buyerBusinessName,
+        buyerProvince: buyerData.buyerProvince,
+        buyerAddress: buyerData.buyerAddress,
+        buyerRegistrationType: buyerData.buyerRegistrationType
+      };
+
       if (selectedBuyer) {
         // Update existing buyer
-        await api.put(`/update-buyer/${selectedBuyer._id}`, buyerData);
-        setBuyers(buyers.map(b => b._id === selectedBuyer._id ? buyerData : b));
+        const response = await api.put(`/tenant/${selectedTenant.tenant_id}/buyers/${selectedBuyer.id}`, transformedData);
+        setBuyers(buyers.map(b => b.id === selectedBuyer.id ? response.data.data : b));
         toast.success('Buyer updated successfully! The changes have been saved.');
       } else {
         // Create new buyer
-        const response = await api.post('/register-buyer', buyerData);
-        setBuyers([...buyers, response.data.user]);
+        const response = await api.post(`/tenant/${selectedTenant.tenant_id}/buyers`, transformedData);
+        setBuyers([...buyers, response.data.data]);
         toast.success('Buyer added successfully! The buyer has been added to your system.');
       }
     } catch (error) {
@@ -85,8 +97,8 @@ const Buyers = () => {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          await api.delete(`/delete-buyer/${buyerId}`);
-          setBuyers(buyers.filter(b => b._id !== buyerId));
+          await api.delete(`/tenant/${selectedTenant.tenant_id}/buyers/${buyerId}`);
+          setBuyers(buyers.filter(b => b.id !== buyerId));
           toast.success('Buyer deleted successfully! The buyer has been removed from your system.');
         } catch (error) {
           console.error('Error deleting buyer:', error);
@@ -97,16 +109,16 @@ const Buyers = () => {
   };
 
   useEffect(() => {
-    const fetchBuyers = async () => {
-      try {
-        const response = await api.get('/get-buyers');
-        setBuyers(response.data.users);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching buyers:', error);
-        setLoading(false);
-      }
-    };
+      const fetchBuyers = async () => {
+    try {
+      const response = await api.get(`/tenant/${selectedTenant.tenant_id}/buyers`);
+      setBuyers(response.data.data.buyers);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching buyers:', error);
+      setLoading(false);
+    }
+  };
 
     fetchBuyers();
   }, []);
@@ -114,19 +126,32 @@ const Buyers = () => {
   const filteredBuyers = filter === 'All' ? buyers : buyers.filter(b => b.buyerRegistrationType === filter);
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-       
+    <TenantSelectionPrompt>
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+         
+        </div>
+        {!selectedTenant ? (
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '40px', 
+            color: '#666' 
+          }}>
+            <h3>No Tenant Selected</h3>
+            <p>Please select a tenant to manage buyers.</p>
+          </div>
+        ) : (
+          <BuyerTable
+            buyers={filteredBuyers}
+            loading={loading}
+            onEdit={openModal}
+            onDelete={handleDelete}
+            onAdd={openModal} 
+          />
+        )}
+        <BuyerModal isOpen={isModalOpen} onClose={closeModal} onSave={handleSave} buyer={selectedBuyer} />
       </div>
-      <BuyerTable
-        buyers={filteredBuyers}
-        loading={loading}
-        onEdit={openModal}
-        onDelete={handleDelete}
-        onAdd={openModal} 
-      />
-      <BuyerModal isOpen={isModalOpen} onClose={closeModal} onSave={handleSave} buyer={selectedBuyer} />
-    </div>
+    </TenantSelectionPrompt>
   );
 };
 
