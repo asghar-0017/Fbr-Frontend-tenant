@@ -463,6 +463,10 @@ export default function CreateInvoice() {
             message: `Quantity is required for item ${index + 1}`,
           },
           {
+            field: "unitPrice",
+            message: `Unit Price is required for item ${index + 1}`,
+          },
+          {
             field: "valueSalesExcludingST",
             message: `Value Sales Excluding ST is required for item ${
               index + 1
@@ -513,13 +517,13 @@ export default function CreateInvoice() {
           salesTaxApplicable: Number(Number(rest.salesTaxApplicable).toFixed(2)),
           salesTaxWithheldAtSource: Number(rest.salesTaxWithheldAtSource) || 0,
           totalValues: Number(Number(rest.totalValues).toFixed(2)),
-          sroScheduleNo: rest.sroScheduleNo?.trim() || "N/A",
-          sroItemSerialNo: rest.sroItemSerialNo?.trim() || "N/A",
-          productDescription: rest.productDescription?.trim() || "N/A",
+          sroScheduleNo: rest.sroScheduleNo?.trim() || null,
+          sroItemSerialNo: rest.sroItemSerialNo?.trim() || null,
+          productDescription: rest.productDescription?.trim() || null,
           saleType: rest.saleType?.trim() || "Goods at standard rate (default)",
           extraTax: (rest.extraTax !== undefined && rest.extraTax !== null && rest.extraTax !== "" && Number(rest.extraTax) !== 0)
             ? parseInt(rest.extraTax, 10)
-            : "",
+            : null,
           furtherTax: Number(rest.furtherTax) || 0,
           fedPayable: Number(rest.fedPayable) || 0,
           discount: Number(rest.discount) || 0,
@@ -531,6 +535,9 @@ export default function CreateInvoice() {
         invoiceDate: dayjs(formData.invoiceDate).format("YYYY-MM-DD"),
         items: cleanedItems,
       };
+
+      // Debug: Log the cleaned data being sent
+      console.log("Cleaned data being sent to backend:", JSON.stringify(cleanedData, null, 2));
 
       const token = localStorage.getItem("token");
       console.log("Token used:", token);
