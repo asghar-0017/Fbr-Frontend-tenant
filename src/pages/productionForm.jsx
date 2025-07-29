@@ -432,20 +432,28 @@ export default function ProductionFoam() {
       }
 
       const cleanedItems = formData.items.map(
-        ({ isSROScheduleEnabled, isSROItemEnabled, ...rest }) => ({
-          ...rest,
-          quantity: rest.quantity === "" ? 0 : parseInt(rest.quantity, 10),
-          sroScheduleNo: rest.sroScheduleNo?.trim() || "",
-          sroItemSerialNo: rest.sroItemSerialNo?.trim() || "",
-          productDescription: rest.productDescription?.trim() || "N/A",
-          saleType: rest.saleType?.trim() || "Goods at standard rate (default)",
-          extraTax: Number(rest.extraTax) || 0,
-          furtherTax: Number(rest.furtherTax) || 0,
-          fedPayable: Number(rest.fedPayable) || 0,
-          discount: Number(rest.discount) || 0,
-          salesTaxApplicable: Number(Number(rest.salesTaxApplicable).toFixed(2)),
-          totalValues: Number(Number(rest.totalValues).toFixed(2)),
-        })
+        ({ isSROScheduleEnabled, isSROItemEnabled, ...rest }) => {
+          const baseItem = {
+            ...rest,
+            quantity: rest.quantity === "" ? 0 : parseInt(rest.quantity, 10),
+            sroScheduleNo: rest.sroScheduleNo?.trim() || "",
+            sroItemSerialNo: rest.sroItemSerialNo?.trim() || "",
+            productDescription: rest.productDescription?.trim() || "N/A",
+            saleType: rest.saleType?.trim() || "Goods at standard rate (default)",
+            furtherTax: Number(rest.furtherTax) || 0,
+            fedPayable: Number(rest.fedPayable) || 0,
+            discount: Number(rest.discount) || 0,
+            salesTaxApplicable: Number(Number(rest.salesTaxApplicable).toFixed(2)),
+            totalValues: Number(Number(rest.totalValues).toFixed(2)),
+          };
+
+          // Only include extraTax if saleType is NOT "Goods at Reduced Rate"
+          if (rest.saleType?.trim() !== "Goods at Reduced Rate") {
+            baseItem.extraTax = Number(rest.extraTax) || 0;
+          }
+
+          return baseItem;
+        }
       );
 
       const cleanedData = {

@@ -96,26 +96,12 @@ export default function BasicTable() {
         return;
       }
       
-      // Create a new window with the print URL
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        alert("Please allow popups to print invoices");
-        return;
-      }
+      const link =`${import.meta.env.VITE_SERVER_API_LOCAL}/print-invoice/${invoice.invoiceNumber}`
+  
+    
+      window.open(link, '_blank');
       
-      // Make an authenticated request to get the print content
-      const response = await api.get(`/tenant/${selectedTenant.tenant_id}/invoices/${invoice.id}/print`, {
-        responseType: 'text'
-      });
-      
-      // Write the HTML content to the new window
-      printWindow.document.write(response.data);
-      printWindow.document.close();
-      
-      // Wait for content to load then print
-      setTimeout(() => {
-        printWindow.print();
-      }, 1000);
+
     } catch (error) {
       console.error("Error printing invoice:", error);
       if (error.response?.status === 401) {
