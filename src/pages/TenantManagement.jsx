@@ -68,7 +68,6 @@ const TenantManagement = () => {
       timer: 2000,
       showConfirmButton: false
     });
-    navigate('/');
   };
 
   if (loading) {
@@ -83,9 +82,13 @@ const TenantManagement = () => {
     <Box sx={{ p: 3 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h1">
-          Select Tenant
+          Select Company
         </Typography>
       </Box>
+
+      <Alert severity="info" sx={{ mb: 3 }}>
+        <strong>Welcome!</strong> Please select a company to work with. Each company has its own separate database for invoices and buyers.
+      </Alert>
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
@@ -94,7 +97,7 @@ const TenantManagement = () => {
       )}
 
       {selectedTenant && (
-        <Alert severity="info" sx={{ mb: 3 }}>
+        <Alert severity="success" sx={{ mb: 3 }}>
           Currently working with: <strong>{selectedTenant.sellerBusinessName}</strong>
         </Alert>
       )}

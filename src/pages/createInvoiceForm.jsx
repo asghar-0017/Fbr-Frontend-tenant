@@ -32,6 +32,7 @@ import { useTenantSelection } from "../Context/TenantSelectionProvider";
 import TenantDashboard from "../component/TenantDashboard";
 
 export default function CreateInvoice() {
+ 
   const { selectedTenant } = useTenantSelection();
   
   const [formData, setFormData] = React.useState({
@@ -111,6 +112,7 @@ export default function CreateInvoice() {
       });
       console.log('Available provinces:', province);
       console.log('Tenant province value:', selectedTenant.sellerProvince);
+      localStorage.setItem("sellerProvince", selectedTenant.sellerProvince);
       console.log('Province match found:', province.find(p => p.stateProvinceDesc === selectedTenant.sellerProvince));
       
       setFormData(prev => ({
@@ -141,7 +143,7 @@ export default function CreateInvoice() {
       }),
       fetch("https://gw.fbr.gov.pk/pdi/v1/itemdesccode", {
         headers: {
-          Authorization: `Bearer ${API_CONFIG.sandBoxTestToken}`,
+          Authorization: `Bearer ${API_CONFIG.getCurrentToken('sandbox')}`,
         },
       })
         .then((response) => (response.ok ? response.json() : Promise.reject()))
@@ -165,9 +167,10 @@ export default function CreateInvoice() {
         setScenario(res);
       }),
     ]).finally(() => setAllLoading(false));
-  }, []);
+  }, [selectedTenant]);
 
   useEffect(() => {
+   
     const fetchBuyers = async () => {
       try {
         if (!selectedTenant) {
@@ -191,6 +194,7 @@ export default function CreateInvoice() {
     };
 
     fetchBuyers();
+  
   }, [selectedTenant]);
 
   useEffect(() => {
@@ -591,24 +595,32 @@ export default function CreateInvoice() {
       }
 
       const cleanedItems = formData.items.map(
-        ({ isSROScheduleEnabled, isSROItemEnabled, retailPrice, isValueSalesManual, isTotalValuesManual, isSalesTaxManual, isSalesTaxWithheldManual, isFurtherTaxManual, isFedPayableManual, ...rest }) => ({
-          ...rest,
-          fixedNotifiedValueOrRetailPrice: Number(Number(retailPrice).toFixed(2)), // send as required by FBR
-          quantity: rest.quantity === "" ? 0 : parseInt(rest.quantity, 10),
-          unitPrice: Number(rest.unitPrice) || 0,
-          valueSalesExcludingST: Number(rest.valueSalesExcludingST) || 0,
-          salesTaxApplicable: Number(Number(rest.salesTaxApplicable).toFixed(2)),
-          salesTaxWithheldAtSource: Number(rest.salesTaxWithheldAtSource) || 0,
-          totalValues: Number(Number(rest.totalValues).toFixed(2)),
-          sroScheduleNo: rest.sroScheduleNo?.trim() || null,
-          sroItemSerialNo: rest.sroItemSerialNo?.trim() || null,
-          productDescription: rest.productDescription?.trim() || null,
-          saleType: rest.saleType?.trim() || "Goods at standard rate (default)",
-          extraTax: Number(rest.extraTax) || 0,
-          furtherTax: Number(rest.furtherTax) || 0,
-          fedPayable: Number(rest.fedPayable) || 0,
-          discount: Number(rest.discount) || 0,
-        })
+        ({ isSROScheduleEnabled, isSROItemEnabled, retailPrice, isValueSalesManual, isTotalValuesManual, isSalesTaxManual, isSalesTaxWithheldManual, isFurtherTaxManual, isFedPayableManual, ...rest }) => {
+          const baseItem = {
+            ...rest,
+            fixedNotifiedValueOrRetailPrice: Number(Number(retailPrice).toFixed(2)), // send as required by FBR
+            quantity: rest.quantity === "" ? 0 : parseInt(rest.quantity, 10),
+            unitPrice: Number(rest.unitPrice) || 0,
+            valueSalesExcludingST: Number(rest.valueSalesExcludingST) || 0,
+            salesTaxApplicable: Number(Number(rest.salesTaxApplicable).toFixed(2)),
+            salesTaxWithheldAtSource: Number(rest.salesTaxWithheldAtSource) || 0,
+            totalValues: Number(Number(rest.totalValues).toFixed(2)),
+            sroScheduleNo: rest.sroScheduleNo?.trim() || null,
+            sroItemSerialNo: rest.sroItemSerialNo?.trim() || null,
+            productDescription: rest.productDescription?.trim() || null,
+            saleType: rest.saleType?.trim() || "Goods at standard rate (default)",
+            furtherTax: Number(rest.furtherTax) || 0,
+            fedPayable: Number(rest.fedPayable) || 0,
+            discount: Number(rest.discount) || 0,
+          };
+
+          // Only include extraTax if saleType is NOT "Goods at Reduced Rate"
+          if (rest.saleType?.trim() !== "Goods at Reduced Rate") {
+            baseItem.extraTax = Number(rest.extraTax) || 0;
+          }
+
+          return baseItem;
+        }
       );
 
       const cleanedData = {
@@ -626,7 +638,8 @@ export default function CreateInvoice() {
 
       const validateRes = await postData(
         "di_data/v1/di/validateinvoicedata_sb",
-        cleanedData
+        cleanedData,
+        'sandbox'
       );
 
       if (
@@ -636,7 +649,8 @@ export default function CreateInvoice() {
         try {
           const postRes = await postData(
             "di_data/v1/di/postinvoicedata_sb",
-            cleanedData
+            cleanedData,
+            'sandbox'
           );
           console.log("Post Invoice Response:", postRes);
           if (
@@ -904,7 +918,7 @@ export default function CreateInvoice() {
                 {selectedTenant && selectedTenant.sellerProvince && 
                  !province.find(p => p.stateProvinceDesc === selectedTenant.sellerProvince) && (
                   <MenuItem value={selectedTenant.sellerProvince}>
-                    {selectedTenant.sellerProvince} (Custom)
+                    {selectedTenant.sellerProvince}
                   </MenuItem>
                 )}
                 {/* Standard FBR provinces */}
@@ -1005,6 +1019,14 @@ export default function CreateInvoice() {
                   onChange={(e) => handleChange("buyerProvince", e.target.value)}
                   disabled={true}
                 >
+                  {/* Add buyer's province if it's not in the FBR list */}
+                  {formData.buyerProvince && 
+                   !province.find(p => p.stateProvinceDesc === formData.buyerProvince) && (
+                    <MenuItem value={formData.buyerProvince}>
+                      {formData.buyerProvince}
+                    </MenuItem>
+                  )}
+                  {/* Standard FBR provinces */}
                   {province.map((prov) => (
                     <MenuItem
                       key={prov.stateProvinceCode}

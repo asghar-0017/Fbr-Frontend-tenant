@@ -41,7 +41,17 @@ export const AuthProvider = ({ children }) => {
           showConfirmButton: false
         });
 
-        navigate("/");
+        // Redirect based on user role and reload the screen
+        if (userData.role === 'admin') {
+          navigate("/tenant-management");
+        } else {
+          navigate("/");
+        }
+        
+        // Reload the screen after successful login
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
       } else {
         // Handle legacy response format
         if (response.data.data && response.data.data.token) {
@@ -61,7 +71,17 @@ export const AuthProvider = ({ children }) => {
             showConfirmButton: false
           });
 
-          navigate("/");
+          // Redirect based on user role and reload the screen
+          if (userData.role === 'admin') {
+            navigate("/tenant-management");
+          } else {
+            navigate("/");
+          }
+          
+          // Reload the screen after successful login
+          setTimeout(() => {
+            window.location.reload();
+          }, 100);
         } else {
           throw new Error('Invalid response format');
         }
@@ -123,6 +143,11 @@ export const AuthProvider = ({ children }) => {
       });
       
       navigate("/login");
+      
+      // Reload the screen after logout
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
     }
   };
 

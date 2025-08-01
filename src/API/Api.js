@@ -1,10 +1,36 @@
 import axios from 'axios';
 
+// Create a token manager that will be updated by the context
+let tokenManager = {
+  getSandboxToken: () => null,
+  getProductionToken: () => null,
+  getCurrentToken: (environment = 'sandbox') => null
+};
+
+// Function to update token manager from context
+export const updateTokenManager = (manager) => {
+  console.log('API: Updating token manager with:', manager);
+  tokenManager = manager;
+};
+
 const API_CONFIG = {
   apiKey: import.meta.env.VITE_SERVER_API || '/api',
   apiKeyLocal: import.meta.env.VITE_SERVER_API_LOCAL || '/api',
-  sandBoxTestToken: '63f756ee-69e4-3b5b-a3b7-0b8656624912'
-  // sandBoxTestToken: '2ad94ba1-3c8d-34ae-9f28-2f6e7bc86545'
+  get sandBoxTestToken() {
+    const token = tokenManager.getSandboxToken();
+    console.log('API_CONFIG: sandBoxTestToken =', token);
+    return token;
+  },
+  get productionToken() {
+    const token = tokenManager.getProductionToken();
+    console.log('API_CONFIG: productionToken =', token);
+    return token;
+  },
+  getCurrentToken(environment = 'sandbox') {
+    const token = tokenManager.getCurrentToken(environment);
+    console.log('API_CONFIG: getCurrentToken(', environment, ') =', token);
+    return token;
+  }
 };
 
 const api = axios.create({
@@ -45,5 +71,18 @@ api.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+
+// Utility function to get current token state for debugging
+export const getCurrentTokenState = () => {
+  const selectedTenant = localStorage.getItem('selectedTenant');
+  
+  return {
+    selectedTenant: selectedTenant ? JSON.parse(selectedTenant) : null,
+    sandBoxTestToken: API_CONFIG.sandBoxTestToken,
+    productionToken: API_CONFIG.productionToken,
+    currentSandboxToken: tokenManager.getSandboxToken(),
+    currentProductionToken: tokenManager.getProductionToken()
+  };
+};
 
 export { API_CONFIG, api };

@@ -9,10 +9,11 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/api': {
-        target: 'http://localhost:5173',
+        target: 'https://einvoice.inplsoftwares.online',
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path.replace(/^\/api/, '/api')
       }
     }
   },
-})
+});

@@ -138,9 +138,6 @@ export default function BasicTable() {
     }
   };
 
-  // Sort invoices so the last one (newest) appears first
-  const sortedInvoices = [...invoices].reverse();
-
   // Filtered invoices with date filter
   const filteredInvoices = [...(invoices || [])].filter((row) => {
     // Sale type filter
@@ -155,7 +152,7 @@ export default function BasicTable() {
       dateMatch = dayjs(row.invoiceDate).isSame(dayjs(invoiceDate), 'day');
     }
     return saleTypeMatch && (invoiceNumberMatch || buyerNTNMatch) && dateMatch;
-  }).reverse();
+  });
 
   // Pagination logic
   const totalPages = Math.ceil(filteredInvoices.length / rowsPerPage);

@@ -20,11 +20,7 @@ const Login = ({ onLogin }) => {
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate("/");
-    }
-  }, [isAuthenticated, navigate]);
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();

@@ -41,6 +41,12 @@ export const TenantProvider = ({ children }) => {
         });
 
         navigate("/buyers");
+        
+        // Reload the screen after successful tenant login
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
+        
         return true;
       }
       
@@ -85,6 +91,11 @@ export const TenantProvider = ({ children }) => {
     });
     
     navigate("/tenant-login");
+    
+    // Reload the screen after tenant logout
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   };
 
   const verifyTenantToken = async () => {

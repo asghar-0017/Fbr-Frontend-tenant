@@ -17,12 +17,14 @@ import {
   Receipt as ReceiptIcon,
   LocationOn as LocationIcon
 } from '@mui/icons-material';
+import { getCurrentTokenState } from '../API/Api';
 
 const TenantDashboard = () => {
   const { selectedTenant } = useTenantSelection();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const tokenState = getCurrentTokenState();
 
   useEffect(() => {
     if (selectedTenant) {
@@ -57,7 +59,7 @@ const TenantDashboard = () => {
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" component="h1" gutterBottom>
-        Tenant Dashboard
+        Dashboard
       </Typography>
 
       {/* Tenant Information Card */}
@@ -139,15 +141,19 @@ const TenantDashboard = () => {
         </Grid>
       ) : null}
 
-      {/* Quick Actions */}
-      <Box sx={{ mt: 4 }}>
-        <Typography variant="h6" gutterBottom>
-          Quick Actions
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Use the navigation menu to create invoices, manage buyers, and view your invoice history for this tenant.
-        </Typography>
-      </Box>
+      {/* Debug section - remove in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <Box mt={2} p={2} bgcolor="rgba(255,255,255,0.1)" borderRadius={1}>
+          <Typography variant="caption" display="block" mb={1}>
+          </Typography>
+          <Typography variant="caption" display="block">
+          </Typography>
+          <Typography variant="caption" display="block">
+          </Typography>
+          <Typography variant="caption" display="block">
+          </Typography>
+        </Box>
+      )}
     </Box>
   );
 };

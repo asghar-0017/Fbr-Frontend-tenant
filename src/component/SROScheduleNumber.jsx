@@ -12,6 +12,67 @@ const SROScheduleNumber = ({
 }) => {
   const [sro, setSro] = useState([]);
 
+  // Function to find province with flexible matching
+  const findProvince = (provinceResponse, selectedProvince) => {
+    if (!provinceResponse || !Array.isArray(provinceResponse)) {
+      return null;
+    }
+
+    // First try exact match
+    let province = provinceResponse.find(
+      (prov) => prov.stateProvinceDesc === selectedProvince
+    );
+
+    if (province) {
+      return province;
+    }
+
+    // Try case-insensitive match
+    province = provinceResponse.find(
+      (prov) => prov.stateProvinceDesc.toLowerCase() === selectedProvince.toLowerCase()
+    );
+
+    if (province) {
+      return province;
+    }
+
+    // Try partial match (e.g., "SINDH" might match "SINDH PROVINCE")
+    province = provinceResponse.find(
+      (prov) => 
+        prov.stateProvinceDesc.toLowerCase().includes(selectedProvince.toLowerCase()) ||
+        selectedProvince.toLowerCase().includes(prov.stateProvinceDesc.toLowerCase())
+    );
+
+    if (province) {
+      return province;
+    }
+
+    // Try common variations
+    const variations = {
+      'SINDH': ['SINDH PROVINCE', 'SINDH', 'Sindh', 'Sindh Province'],
+      'PUNJAB': ['PUNJAB PROVINCE', 'PUNJAB', 'Punjab', 'Punjab Province'],
+      'KPK': ['KHYBER PAKHTUNKHWA', 'KPK', 'Khyber Pakhtunkhwa'],
+      'BALOCHISTAN': ['BALOCHISTAN PROVINCE', 'BALOCHISTAN', 'Balochistan'],
+      'FEDERAL': ['FEDERAL TERRITORY', 'FEDERAL', 'Federal Territory', 'ISLAMABAD'],
+      'AJK': ['AZAD JAMMU & KASHMIR', 'AJK', 'Azad Jammu & Kashmir'],
+      'GB': ['GILGIT BALTISTAN', 'GB', 'Gilgit Baltistan']
+    };
+
+    const selectedProvinceUpper = selectedProvince.toUpperCase();
+    if (variations[selectedProvinceUpper]) {
+      for (const variation of variations[selectedProvinceUpper]) {
+        province = provinceResponse.find(
+          (prov) => prov.stateProvinceDesc.toUpperCase() === variation.toUpperCase()
+        );
+        if (province) {
+          return province;
+        }
+      }
+    }
+
+    return null;
+  };
+
   const getSRO = async () => {
     try {
       var RateId = localStorage.getItem("selectedRateId");
@@ -25,9 +86,7 @@ const SROScheduleNumber = ({
       const provinceResponse = JSON.parse(
         localStorage.getItem("provinceResponse") || "[]"
       );
-      const selectedProvinceObj = provinceResponse.find(
-        (prov) => prov.stateProvinceDesc === selectedProvince
-      );
+      const selectedProvinceObj = findProvince(provinceResponse, selectedProvince);
 
       if (!selectedProvinceObj) {
         console.warn(

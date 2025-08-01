@@ -30,7 +30,8 @@ import TenantSelectionPrompt from "../component/TenantSelectionPrompt";
 import { useTenantSelection } from "../Context/TenantSelectionProvider";
 import TenantDashboard from "../component/TenantDashboard";
 
-const { apiKeyLocal, sandBoxTestToken } = API_CONFIG;
+// Don't destructure sandBoxTestToken at import time, use it dynamically
+const { apiKeyLocal } = API_CONFIG;
 
 export default function ProductionFoam() {
   const { selectedTenant } = useTenantSelection();
@@ -124,7 +125,7 @@ export default function ProductionFoam() {
       }),
       fetch("https://gw.fbr.gov.pk/pdi/v1/itemdesccode", {
         headers: {
-          Authorization: `Bearer ${sandBoxTestToken}`,
+          Authorization: `Bearer ${API_CONFIG.getCurrentToken('production')}`,
         },
       })
         .then((response) => (response.ok ? response.json() : Promise.reject()))
@@ -143,9 +144,9 @@ export default function ProductionFoam() {
             { docTypeId: 9, docDescription: "Debit Note" },
           ])
         ),
-      fetchData("pdi/v1/transtypecode").then((res) => setTransactionTypes(res)),
+      fetchData("pdi/v1/transtypecode", 'production').then((res) => setTransactionTypes(res)),
     ]).finally(() => setAllLoading(false));
-  }, []);
+  }, [selectedTenant]);
 
   useEffect(() => {
     fetch(`${apiKeyLocal}/get-buyers`, {
@@ -467,7 +468,8 @@ export default function ProductionFoam() {
 
       const validateRes = await postData(
         "di_data/v1/di/validateinvoicedata_sb",
-        cleanedData
+        cleanedData,
+        'production'
       );
 
       if (
@@ -477,7 +479,8 @@ export default function ProductionFoam() {
         try {
           const postRes = await postData(
             "di_data/v1/di/postinvoicedata_sb",
-            cleanedData
+            cleanedData,
+            'production'
           );
           console.log("Post Invoice Response:", postRes);
           if (
@@ -722,7 +725,7 @@ export default function ProductionFoam() {
                 {selectedTenant && selectedTenant.sellerProvince && 
                  !province.find(p => p.stateProvinceDesc === selectedTenant.sellerProvince) && (
                   <MenuItem value={selectedTenant.sellerProvince}>
-                    {selectedTenant.sellerProvince} (Custom)
+                    {selectedTenant.sellerProvince}
                   </MenuItem>
                 )}
                 {/* Standard FBR provinces */}
@@ -823,6 +826,14 @@ export default function ProductionFoam() {
                   onChange={(e) => handleChange("buyerProvince", e.target.value)}
                   disabled={true}
                 >
+                  {/* Add buyer's province if it's not in the FBR list */}
+                  {formData.buyerProvince && 
+                   !province.find(p => p.stateProvinceDesc === formData.buyerProvince) && (
+                    <MenuItem value={formData.buyerProvince}>
+                      {formData.buyerProvince}
+                    </MenuItem>
+                  )}
+                  {/* Standard FBR provinces */}
                   {province.map((prov) => (
                     <MenuItem
                       key={prov.stateProvinceCode}
