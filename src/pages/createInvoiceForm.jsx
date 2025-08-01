@@ -405,9 +405,7 @@ export default function CreateInvoice() {
           parseFloat(item.fedPayable || 0) +
           parseFloat(item.extraTax || 0);
 
-        const discountPercent = parseFloat(item.discount || 0);
-        const discountAmount =
-          (calculatedTotalBeforeDiscount * discountPercent) / 100;
+        const discountAmount = parseFloat(item.discount || 0);
 
         const totalAfterDiscount =
           calculatedTotalBeforeDiscount - discountAmount;
