@@ -32,9 +32,8 @@ import { useTenantSelection } from "../Context/TenantSelectionProvider";
 import TenantDashboard from "../component/TenantDashboard";
 
 export default function CreateInvoice() {
- 
   const { selectedTenant } = useTenantSelection();
-  
+
   const [formData, setFormData] = React.useState({
     invoiceType: "",
     invoiceDate: dayjs(),
@@ -102,20 +101,25 @@ export default function CreateInvoice() {
 
   // Update form data when selected tenant changes
   React.useEffect(() => {
-    console.log('SelectedTenant changed:', selectedTenant);
+    console.log("SelectedTenant changed:", selectedTenant);
     if (selectedTenant) {
-      console.log('Tenant data fields:', {
+      console.log("Tenant data fields:", {
         sellerNTNCNIC: selectedTenant.sellerNTNCNIC,
         sellerBusinessName: selectedTenant.sellerBusinessName,
         sellerProvince: selectedTenant.sellerProvince,
         sellerAddress: selectedTenant.sellerAddress,
       });
-      console.log('Available provinces:', province);
-      console.log('Tenant province value:', selectedTenant.sellerProvince);
+      console.log("Available provinces:", province);
+      console.log("Tenant province value:", selectedTenant.sellerProvince);
       localStorage.setItem("sellerProvince", selectedTenant.sellerProvince);
-      console.log('Province match found:', province.find(p => p.stateProvinceDesc === selectedTenant.sellerProvince));
-      
-      setFormData(prev => ({
+      console.log(
+        "Province match found:",
+        province.find(
+          (p) => p.stateProvinceDesc === selectedTenant.sellerProvince
+        )
+      );
+
+      setFormData((prev) => ({
         ...prev,
         sellerNTNCNIC: selectedTenant.sellerNTNCNIC || "",
         sellerBusinessName: selectedTenant.sellerBusinessName || "",
@@ -124,7 +128,7 @@ export default function CreateInvoice() {
       }));
     } else {
       // Clear seller fields if no tenant is selected
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         sellerNTNCNIC: "",
         sellerBusinessName: "",
@@ -135,6 +139,7 @@ export default function CreateInvoice() {
   }, [selectedTenant, province]);
 
   React.useEffect(() => {
+    console.log("useEffect triggered - selectedTenant:", selectedTenant);
     setAllLoading(true);
     Promise.allSettled([
       fetchData("pdi/v1/provinces").then((response) => {
@@ -143,13 +148,19 @@ export default function CreateInvoice() {
       }),
       fetch("https://gw.fbr.gov.pk/pdi/v1/itemdesccode", {
         headers: {
-          Authorization: `Bearer ${API_CONFIG.getCurrentToken('sandbox')}`,
+          Authorization: `Bearer ${API_CONFIG.getCurrentToken("sandbox")}`,
         },
       })
         .then((response) => (response.ok ? response.json() : Promise.reject()))
-        .then((data) =>
-          setHsCodeList(data.map((item) => ({ hS_CODE: item.hS_CODE })))
-        )
+        .then((data) => {
+          console.log("FBR HS Code API Response:", data);
+          const mappedData = data.map((item) => ({
+            hS_CODE: item.hS_CODE,
+            description: item.description,
+          }));
+          console.log("Mapped HS Code List:", mappedData);
+          setHsCodeList(mappedData);
+        })
         .catch(() => setHsCodeList([])),
       fetch("https://gw.fbr.gov.pk/pdi/v1/doctypecode", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -162,15 +173,76 @@ export default function CreateInvoice() {
             { docTypeId: 9, docDescription: "Debit Note" },
           ])
         ),
-      fetchData("pdi/v1/transtypecode").then((res) => {
-        console.log("Transaction types:", res);
-        setScenario(res);
-      }),
+      (async () => {
+        try {
+          const token = API_CONFIG.getCurrentToken("sandbox");
+          console.log(
+            "Token for transtypecode API:",
+            token ? "Available" : "Not available"
+          );
+          console.log("Token value:", token);
+
+          const response = await fetch(
+            "https://gw.fbr.gov.pk/pdi/v1/transtypecode",
+            {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          console.log("Transtypecode API Response Status:", response.status);
+          console.log(
+            "Transtypecode API Response Headers:",
+            Object.fromEntries(response.headers.entries())
+          );
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Transtypecode API Error Response:", errorText);
+            throw new Error(
+              `HTTP error! status: ${response.status}, body: ${errorText}`
+            );
+          }
+
+          const data = await response.json();
+          console.log("Transaction types from API:", data);
+          console.log("Transaction types data type:", typeof data);
+          console.log("Transaction types is array:", Array.isArray(data));
+          console.log(
+            "Transaction types length:",
+            Array.isArray(data) ? data.length : "N/A"
+          );
+
+          if (Array.isArray(data)) {
+            console.log("Setting scenario with array data:", data);
+            setScenario(data);
+          } else if (data && typeof data === "object") {
+            // If it's a single object, wrap it in an array
+            console.log(
+              "Setting scenario with single object wrapped in array:",
+              [data]
+            );
+            setScenario([data]);
+          } else {
+            console.error("Unexpected data format:", data);
+            setScenario([]);
+          }
+        } catch (error) {
+          console.error("Error fetching transaction types:", error);
+          console.error("Error details:", {
+            message: error.message,
+            stack: error.stack,
+          });
+          setScenario([]);
+        }
+      })(),
     ]).finally(() => setAllLoading(false));
   }, [selectedTenant]);
 
   useEffect(() => {
-   
     const fetchBuyers = async () => {
       try {
         if (!selectedTenant) {
@@ -179,8 +251,10 @@ export default function CreateInvoice() {
           return;
         }
 
-        const response = await api.get(`/tenant/${selectedTenant.tenant_id}/buyers`);
-        
+        const response = await api.get(
+          `/tenant/${selectedTenant.tenant_id}/buyers`
+        );
+
         if (response.data.success) {
           setBuyers(response.data.data.buyers || []);
         } else {
@@ -194,7 +268,6 @@ export default function CreateInvoice() {
     };
 
     fetchBuyers();
-  
   }, [selectedTenant]);
 
   useEffect(() => {
@@ -333,13 +406,17 @@ export default function CreateInvoice() {
           parseFloat(item.extraTax || 0);
 
         const discountPercent = parseFloat(item.discount || 0);
-        const discountAmount = (calculatedTotalBeforeDiscount * discountPercent) / 100;
+        const discountAmount =
+          (calculatedTotalBeforeDiscount * discountPercent) / 100;
 
-        const totalAfterDiscount = calculatedTotalBeforeDiscount - discountAmount;
+        const totalAfterDiscount =
+          calculatedTotalBeforeDiscount - discountAmount;
 
         const taxWithheld = parseFloat(item.salesTaxWithheldAtSource || 0);
 
-        const calculatedTotal = Number((totalAfterDiscount + taxWithheld).toFixed(2));
+        const calculatedTotal = Number(
+          (totalAfterDiscount + taxWithheld).toFixed(2)
+        );
         item.totalValues = calculatedTotal.toString();
       }
 
@@ -348,10 +425,10 @@ export default function CreateInvoice() {
     });
   };
 
-
   const addNewItem = () => {
-    const saleType = localStorage.getItem("saleType") || "Goods at Standard Rate (default)";
-    const productDescription = localStorage.getItem("productDescription") || "";
+    const saleType =
+      localStorage.getItem("saleType") || "Goods at Standard Rate (default)";
+    // const productDescription = localStorage.getItem("productDescription") || "";
 
     setFormData((prev) => ({
       ...prev,
@@ -359,7 +436,7 @@ export default function CreateInvoice() {
         ...prev.items,
         {
           hsCode: "",
-          productDescription: productDescription,
+          productDescription: "", // Don't set scenario description automatically
           rate: "",
           uoM: "",
           quantity: "1",
@@ -405,7 +482,7 @@ export default function CreateInvoice() {
         scenarioId: id,
       }));
       localStorage.removeItem("saleType");
-      localStorage.removeItem("productDescription");
+      // localStorage.removeItem("productDescription");
       setTransactionTypeId(null);
       return;
     }
@@ -425,18 +502,92 @@ export default function CreateInvoice() {
       newTransactionTypeId = "75";
       saleType = "Goods at standard rate (default)";
     } else {
-      // Find matching transaction type from API response
-      const matchingApiRecord = scenario.find((item) => {
-        const normalizeStr = (str) => str?.toLowerCase().replace(/[^a-z0-9]/g, "");
-        return (
-          item.transactioN_DESC &&
-          normalizeStr(item.transactioN_DESC) === normalizeStr(saleType)
-        );
-      });
+      // Find matching transaction type from API response using multi-stage matching
+      console.log("Available scenario data:", scenario);
+      console.log("Scenario data length:", scenario.length);
 
-      if (matchingApiRecord) {
-        newTransactionTypeId = matchingApiRecord.transactioN_TYPE_ID;
-        saleType = matchingApiRecord.transactioN_DESC;
+      if (scenario && scenario.length > 0) {
+        // Log all transactioN_DESC values for debugging
+        console.log("All transactioN_DESC values from API:");
+        scenario.forEach((item, index) => {
+          console.log(`Item ${index}:`, {
+            transactioN_TYPE_ID: item.transactioN_TYPE_ID,
+            transactioN_DESC: item.transactioN_DESC,
+          });
+        });
+        const normalizeStr = (str) =>
+          str?.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+        const normalizedSaleType = normalizeStr(saleType);
+
+        // Stage 1: Exact match
+        let matchingApiRecord = scenario.find((item) => {
+          return (
+            item.transactioN_DESC &&
+            normalizeStr(item.transactioN_DESC) === normalizedSaleType
+          );
+        });
+
+        // Stage 2: Partial match (if exact match fails)
+        if (!matchingApiRecord) {
+          matchingApiRecord = scenario.find((item) => {
+            return (
+              item.transactioN_DESC &&
+              (normalizeStr(item.transactioN_DESC).includes(
+                normalizedSaleType
+              ) ||
+                normalizedSaleType.includes(
+                  normalizeStr(item.transactioN_DESC)
+                ))
+            );
+          });
+        }
+
+        // Stage 3: Generic match for common patterns
+        if (!matchingApiRecord) {
+          const genericPatterns = {
+            "goods at standard rate": "75",
+            "goods at zero rate": "76",
+            "goods at reduced rate": "77",
+            "services at standard rate": "78",
+            "services at zero rate": "79",
+            "services at reduced rate": "80",
+          };
+
+          for (const [pattern, typeId] of Object.entries(genericPatterns)) {
+            if (normalizedSaleType.includes(pattern.replace(/\s+/g, ""))) {
+              matchingApiRecord = scenario.find(
+                (item) => item.transactioN_TYPE_ID === typeId
+              );
+              if (matchingApiRecord) break;
+            }
+          }
+        }
+
+        // Stage 4: Fallback to default if no match found
+        if (!matchingApiRecord) {
+          console.warn(
+            `No matching transaction type found for saleType: ${saleType}`
+          );
+          // Try to find a default record
+          matchingApiRecord = scenario.find(
+            (item) =>
+              item.transactioN_TYPE_ID === "75" ||
+              item.transactioN_DESC?.toLowerCase().includes("default")
+          );
+        }
+
+        if (matchingApiRecord) {
+          newTransactionTypeId = matchingApiRecord.transactioN_TYPE_ID;
+          saleType = matchingApiRecord.transactioN_DESC;
+          console.log("Found matching transaction type:", matchingApiRecord);
+        } else {
+          console.error(
+            "No transaction type found even after all matching stages"
+          );
+        }
+      } else {
+        console.warn("No scenario data available for matching");
       }
     }
 
@@ -446,7 +597,7 @@ export default function CreateInvoice() {
 
     // Update localStorage and state
     localStorage.setItem("saleType", saleType);
-    localStorage.setItem("productDescription", selectedScenario.description);
+    // localStorage.setItem("productDescription", selectedScenario.description);
     if (newTransactionTypeId) {
       localStorage.setItem("transactionTypeId", newTransactionTypeId);
       setTransactionTypeId(newTransactionTypeId);
@@ -457,35 +608,39 @@ export default function CreateInvoice() {
 
     // Update form data
     setFormData((prev) => {
-      const items = prev.items.length > 0
-        ? prev.items.map((item) => ({
-            ...item,
-            productDescription: selectedScenario.description,
-            saleType: saleType,
-            rate: "", // Reset rate when scenario changes
-          }))
-        : [{
-            hsCode: "",
-            productDescription: selectedScenario.description,
-            rate: "",
-            uoM: "",
-            quantity: 1,
-            totalValues: 0,
-            valueSalesExcludingST: 0,
-            fixedNotifiedValueOrRetailPrice: 1,
-            salesTaxApplicable: 0,
-            salesTaxWithheldAtSource: 0,
-            sroScheduleNo: "",
-            sroItemSerialNo: "",
-            extraTax: "",
-            furtherTax: 0,
-            fedPayable: 0,
-            discount: 0,
-            saleType,
-            isSROScheduleEnabled: false,
-            isSROItemEnabled: false,
-            isValueSalesManual: false,
-          }];
+      const items =
+        prev.items.length > 0
+          ? prev.items.map((item) => ({
+              ...item,
+              // Don't update product description with scenario description - keep existing or clear if no HS code
+              productDescription: item.hsCode ? item.productDescription : "",
+              saleType: saleType,
+              rate: "", // Reset rate when scenario changes
+            }))
+          : [
+              {
+                hsCode: "",
+                productDescription: "", // Don't set scenario description automatically
+                rate: "",
+                uoM: "",
+                quantity: 1,
+                totalValues: 0,
+                valueSalesExcludingST: 0,
+                fixedNotifiedValueOrRetailPrice: 1,
+                salesTaxApplicable: 0,
+                salesTaxWithheldAtSource: 0,
+                sroScheduleNo: "",
+                sroItemSerialNo: "",
+                extraTax: "",
+                furtherTax: 0,
+                fedPayable: 0,
+                discount: 0,
+                saleType,
+                isSROScheduleEnabled: false,
+                isSROItemEnabled: false,
+                isValueSalesManual: false,
+              },
+            ];
       return {
         ...prev,
         scenarioId: id,
@@ -595,20 +750,37 @@ export default function CreateInvoice() {
       }
 
       const cleanedItems = formData.items.map(
-        ({ isSROScheduleEnabled, isSROItemEnabled, retailPrice, isValueSalesManual, isTotalValuesManual, isSalesTaxManual, isSalesTaxWithheldManual, isFurtherTaxManual, isFedPayableManual, ...rest }) => {
+        ({
+          isSROScheduleEnabled,
+          isSROItemEnabled,
+          retailPrice,
+          isValueSalesManual,
+          isTotalValuesManual,
+          isSalesTaxManual,
+          isSalesTaxWithheldManual,
+          isFurtherTaxManual,
+          isFedPayableManual,
+          ...rest
+        }) => {
           const baseItem = {
             ...rest,
-            fixedNotifiedValueOrRetailPrice: Number(Number(retailPrice).toFixed(2)), // send as required by FBR
+            fixedNotifiedValueOrRetailPrice: Number(
+              Number(retailPrice).toFixed(2)
+            ), // send as required by FBR
             quantity: rest.quantity === "" ? 0 : parseInt(rest.quantity, 10),
             unitPrice: Number(rest.unitPrice) || 0,
             valueSalesExcludingST: Number(rest.valueSalesExcludingST) || 0,
-            salesTaxApplicable: Number(Number(rest.salesTaxApplicable).toFixed(2)),
-            salesTaxWithheldAtSource: Number(rest.salesTaxWithheldAtSource) || 0,
+            salesTaxApplicable: Number(
+              Number(rest.salesTaxApplicable).toFixed(2)
+            ),
+            salesTaxWithheldAtSource:
+              Number(rest.salesTaxWithheldAtSource) || 0,
             totalValues: Number(Number(rest.totalValues).toFixed(2)),
             sroScheduleNo: rest.sroScheduleNo?.trim() || null,
             sroItemSerialNo: rest.sroItemSerialNo?.trim() || null,
             productDescription: rest.productDescription?.trim() || null,
-            saleType: rest.saleType?.trim() || "Goods at standard rate (default)",
+            saleType:
+              rest.saleType?.trim() || "Goods at standard rate (default)",
             furtherTax: Number(rest.furtherTax) || 0,
             fedPayable: Number(rest.fedPayable) || 0,
             discount: Number(rest.discount) || 0,
@@ -631,7 +803,10 @@ export default function CreateInvoice() {
       };
 
       // Debug: Log the cleaned data being sent
-      console.log("Cleaned data being sent to backend:", JSON.stringify(cleanedData, null, 2));
+      console.log(
+        "Cleaned data being sent to backend:",
+        JSON.stringify(cleanedData, null, 2)
+      );
 
       const token = localStorage.getItem("token");
       console.log("Token used:", token);
@@ -639,7 +814,7 @@ export default function CreateInvoice() {
       const validateRes = await postData(
         "di_data/v1/di/validateinvoicedata_sb",
         cleanedData,
-        'sandbox'
+        "sandbox"
       );
 
       if (
@@ -650,7 +825,7 @@ export default function CreateInvoice() {
           const postRes = await postData(
             "di_data/v1/di/postinvoicedata_sb",
             cleanedData,
-            'sandbox'
+            "sandbox"
           );
           console.log("Post Invoice Response:", postRes);
           if (
@@ -745,32 +920,89 @@ export default function CreateInvoice() {
           mb: 6,
         }}
       >
-      <Typography
-        variant="h4"
-        sx={{
-          mb: 3,
-          fontWeight: 900,
-          textTransform: "uppercase",
-          color: "#1976d2",
-          letterSpacing: 2,
-          textAlign: "center",
-        }}
-      >
-        Invoice Creation
-      </Typography>
-      {/* Invoice Type Section */}
-      <Box
-        sx={{
-          border: "1px solid #e3e8ee",
-          borderRadius: 3,
-          p: { xs: 2, sm: 3 },
-          mb: 4,
-          background: "#fff",
-          boxShadow: 2,
-          transition: "box-shadow 0.2s",
-          "&:hover": { boxShadow: 6 },
-        }}
-      >
+        <Typography
+          variant="h4"
+          sx={{
+            mb: 3,
+            fontWeight: 900,
+            textTransform: "uppercase",
+            color: "#1976d2",
+            letterSpacing: 2,
+            textAlign: "center",
+          }}
+        >
+          Invoice Creation
+        </Typography>
+        {/* Invoice Type Section */}
+        <Box
+          sx={{
+            border: "1px solid #e3e8ee",
+            borderRadius: 3,
+            p: { xs: 2, sm: 3 },
+            mb: 4,
+            background: "#fff",
+            boxShadow: 2,
+            transition: "box-shadow 0.2s",
+            "&:hover": { boxShadow: 6 },
+          }}
+        >
+          <Typography
+            variant="h6"
+            sx={{
+              mb: 2,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              color: "#1976d2",
+              letterSpacing: 1,
+            }}
+          >
+            Invoice Details
+          </Typography>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+            <Box sx={{ m: 1, flex: "1 1 30%", minWidth: "250px" }}>
+              <FormControl fullWidth>
+                <InputLabel id="invoice-type-label">Invoice Type</InputLabel>
+                <Select
+                  labelId="invoice-type-label"
+                  value={formData.invoiceType}
+                  label="Invoice Type"
+                  onChange={(e) => handleChange("invoiceType", e.target.value)}
+                >
+                  {invoiceTypes.map((type) => (
+                    <MenuItem key={type.docTypeId} value={type.docDescription}>
+                      {type.docDescription}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+
+            <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DemoContainer components={["DatePicker"]}>
+                  <DatePicker
+                    label="Invoice Date"
+                    value={formData.invoiceDate}
+                    onChange={(date) => handleChange("invoiceDate", date)}
+                    sx={{ width: "100%" }}
+                  />
+                </DemoContainer>
+              </LocalizationProvider>
+            </Box>
+
+            <Box sx={{ m: 1, flex: "1 1 30%", minWidth: "250px" }}>
+              <TextField
+                fullWidth
+                label="Invoice Ref No."
+                value={formData.invoiceRefNo}
+                onChange={(e) => handleChange("invoiceRefNo", e.target.value)}
+                variant="outlined"
+                disabled={formData.invoiceType === "Sale Invoice"}
+              />
+            </Box>
+          </Box>
+        </Box>
+        {/* Seller Detail Section */}
         <Typography
           variant="h6"
           sx={{
@@ -781,221 +1013,81 @@ export default function CreateInvoice() {
             letterSpacing: 1,
           }}
         >
-          Invoice Details
+          Seller Detail
         </Typography>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-          <Box sx={{ m: 1, flex: "1 1 30%", minWidth: "250px" }}>
-            <FormControl fullWidth>
-              <InputLabel id="invoice-type-label">Invoice Type</InputLabel>
-              <Select
-                labelId="invoice-type-label"
-                value={formData.invoiceType}
-                label="Invoice Type"
-                onChange={(e) => handleChange("invoiceType", e.target.value)}
-              >
-                {invoiceTypes.map((type) => (
-                  <MenuItem key={type.docTypeId} value={type.docDescription}>
-                    {type.docDescription}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
 
-          <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <DemoContainer components={["DatePicker"]}>
-                <DatePicker
-                  label="Invoice Date"
-                  value={formData.invoiceDate}
-                  onChange={(date) => handleChange("invoiceDate", date)}
-                  sx={{ width: "100%" }}
-                />
-              </DemoContainer>
-            </LocalizationProvider>
-          </Box>
-
-          <Box sx={{ m: 1, flex: "1 1 30%", minWidth: "250px" }}>
-            <TextField
-              fullWidth
-              label="Invoice Ref No."
-              value={formData.invoiceRefNo}
-              onChange={(e) => handleChange("invoiceRefNo", e.target.value)}
-              variant="outlined"
-              disabled={formData.invoiceType === "Sale Invoice"}
-            />
-          </Box>
-        </Box>
-      </Box>
-      {/* Seller Detail Section */}
-      <Typography
-        variant="h6"
-        sx={{
-          mb: 2,
-          fontWeight: 700,
-          textTransform: "uppercase",
-          color: "#1976d2",
-          letterSpacing: 1,
-        }}
-      >
-        Seller Detail
-      </Typography>
-      
-      {/* Tenant Selection Status */}
-      {selectedTenant ? (
-        <Box sx={{ mb: 2, p: 2, bgcolor: 'success.light', borderRadius: 2, color: 'white' }}>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            ✓ Selected Tenant: {selectedTenant.sellerBusinessName} ({selectedTenant.sellerNTNCNIC})
-          </Typography>
-          <Typography variant="caption" sx={{ opacity: 0.9 }}>
-            Seller information has been automatically populated from the selected tenant.
-          </Typography>
-        </Box>
-      ) : (
-        <Box sx={{ mb: 2, p: 2, bgcolor: 'warning.light', borderRadius: 2, color: 'white' }}>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            ⚠ Please select a tenant to populate seller information
-          </Typography>
-          <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 1 }}>
-            Go to Tenant Management to select a tenant before creating an invoice.
-          </Typography>
-          <Button
-            variant="contained"
-            size="small"
-            onClick={() => navigate('/tenant-management')}
-            sx={{ 
-              bgcolor: 'white', 
-              color: 'warning.main',
-              '&:hover': { bgcolor: 'grey.100' }
+        {/* Tenant Selection Status */}
+        {selectedTenant ? (
+          <Box
+            sx={{
+              mb: 2,
+              p: 2,
+              bgcolor: "success.light",
+              borderRadius: 2,
+              color: "white",
             }}
           >
-            Select Tenant
-          </Button>
-        </Box>
-      )}
-      
-      <Box
-        sx={{
-          border: "1px solid #e3e8ee",
-          borderRadius: 3,
-          p: { xs: 2, sm: 3 },
-          mb: 4,
-          background: selectedTenant ? "#f7fafd" : "#fff5f5",
-          boxShadow: 1,
-          transition: "box-shadow 0.2s",
-          "&:hover": { boxShadow: 4 },
-        }}
-      >
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-          {[
-            { label: "Seller NTN/CNIC", field: "sellerNTNCNIC" },
-            { label: "Seller Business Name", field: "sellerBusinessName" },
-            { label: "Seller Address", field: "sellerAddress" },
-          ].map(({ label, field }) => (
-            <Box key={field} sx={{ flex: "1 1 30%", minWidth: "250px" }}>
-              <TextField
-                fullWidth
-                label={label}
-                value={formData[field]}
-                onChange={(e) => handleChange(field, e.target.value)}
-                variant="outlined"
-                disabled={true}
-              />
-            </Box>
-          ))}
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              ✓ Selected Tenant: {selectedTenant.sellerBusinessName} (
+              {selectedTenant.sellerNTNCNIC})
+            </Typography>
+            <Typography variant="caption" sx={{ opacity: 0.9 }}>
+              Seller information has been automatically populated from the
+              selected tenant.
+            </Typography>
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              mb: 2,
+              p: 2,
+              bgcolor: "warning.light",
+              borderRadius: 2,
+              color: "white",
+            }}
+          >
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              ⚠ Please select a tenant to populate seller information
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{ opacity: 0.9, display: "block", mb: 1 }}
+            >
+              Go to Tenant Management to select a tenant before creating an
+              invoice.
+            </Typography>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => navigate("/tenant-management")}
+              sx={{
+                bgcolor: "white",
+                color: "warning.main",
+                "&:hover": { bgcolor: "grey.100" },
+              }}
+            >
+              Select Tenant
+            </Button>
+          </Box>
+        )}
 
-          <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
-            <FormControl fullWidth>
-              <InputLabel id="seller-province-label">Seller Province</InputLabel>
-              <Select
-                labelId="seller-province-label"
-                value={formData.sellerProvince}
-                label="Seller Province"
-                onChange={(e) => handleChange("sellerProvince", e.target.value)}
-                disabled={true}
-              >
-                {/* Add tenant's province if it's not in the FBR list */}
-                {selectedTenant && selectedTenant.sellerProvince && 
-                 !province.find(p => p.stateProvinceDesc === selectedTenant.sellerProvince) && (
-                  <MenuItem value={selectedTenant.sellerProvince}>
-                    {selectedTenant.sellerProvince}
-                  </MenuItem>
-                )}
-                {/* Standard FBR provinces */}
-                {province.map((prov) => (
-                  <MenuItem
-                    key={prov.stateProvinceCode}
-                    value={prov.stateProvinceDesc}
-                  >
-                    {prov.stateProvinceDesc}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-        </Box>
-      </Box>
-      {/* Buyer Detail Section */}
-      <Typography
-        variant="h6"
-        sx={{
-          mb: 2,
-          fontWeight: 700,
-          textTransform: "uppercase",
-          color: "#1976d2",
-          letterSpacing: 1,
-        }}
-      >
-        Buyer Detail
-      </Typography>
-      <Box
-        sx={{
-          border: "1px solid #e3e8ee",
-          borderRadius: 3,
-          p: { xs: 2, sm: 3 },
-          mb: 4,
-          background: "#fff",
-          boxShadow: 1,
-          transition: "box-shadow 0.2s",
-          "&:hover": { boxShadow: 4 },
-        }}
-      >
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-          <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
-            <Autocomplete
-              fullWidth
-              options={buyers}
-              getOptionLabel={(option) =>
-                option.buyerBusinessName
-                  ? `${option.buyerBusinessName} (${option.buyerNTNCNIC})`
-                  : ""
-              }
-              value={buyers.find((b) => b.id === selectedBuyerId) || null}
-              onChange={(_, newValue) =>
-                setSelectedBuyerId(newValue ? newValue.id : "")
-              }
-              renderInput={(params) => (
-                <TextField {...params} label="Select Buyer" variant="outlined" />
-              )}
-              isOptionEqualToValue={(option, value) => option.id === value.id}
-              getOptionKey={(option) =>
-                option.id ||
-                option.buyerNTNCNIC ||
-                option.buyerBusinessName ||
-                option.buyerAddress ||
-                Math.random()
-              }
-            />
-          </Box>
-        </Box>
-        
-        {/* Buyer Details Fields - Only show when a buyer is selected */}
-        {selectedBuyerId && (
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3, mt: 3 }}>
+        <Box
+          sx={{
+            border: "1px solid #e3e8ee",
+            borderRadius: 3,
+            p: { xs: 2, sm: 3 },
+            mb: 4,
+            background: selectedTenant ? "#f7fafd" : "#fff5f5",
+            boxShadow: 1,
+            transition: "box-shadow 0.2s",
+            "&:hover": { boxShadow: 4 },
+          }}
+        >
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
             {[
-              { label: "Buyer NTN/CNIC", field: "buyerNTNCNIC" },
-              { label: "Buyer Business Name", field: "buyerBusinessName" },
-              { label: "Buyer Address", field: "buyerAddress" },
+              { label: "Seller NTN/CNIC", field: "sellerNTNCNIC" },
+              { label: "Seller Business Name", field: "sellerBusinessName" },
+              { label: "Seller Address", field: "sellerAddress" },
             ].map(({ label, field }) => (
               <Box key={field} sx={{ flex: "1 1 30%", minWidth: "250px" }}>
                 <TextField
@@ -1011,21 +1103,29 @@ export default function CreateInvoice() {
 
             <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
               <FormControl fullWidth>
-                <InputLabel id="buyer-province-label">Buyer Province</InputLabel>
+                <InputLabel id="seller-province-label">
+                  Seller Province
+                </InputLabel>
                 <Select
-                  labelId="buyer-province-label"
-                  value={formData.buyerProvince}
-                  label="Buyer Province"
-                  onChange={(e) => handleChange("buyerProvince", e.target.value)}
+                  labelId="seller-province-label"
+                  value={formData.sellerProvince}
+                  label="Seller Province"
+                  onChange={(e) =>
+                    handleChange("sellerProvince", e.target.value)
+                  }
                   disabled={true}
                 >
-                  {/* Add buyer's province if it's not in the FBR list */}
-                  {formData.buyerProvince && 
-                   !province.find(p => p.stateProvinceDesc === formData.buyerProvince) && (
-                    <MenuItem value={formData.buyerProvince}>
-                      {formData.buyerProvince}
-                    </MenuItem>
-                  )}
+                  {/* Add tenant's province if it's not in the FBR list */}
+                  {selectedTenant &&
+                    selectedTenant.sellerProvince &&
+                    !province.find(
+                      (p) =>
+                        p.stateProvinceDesc === selectedTenant.sellerProvince
+                    ) && (
+                      <MenuItem value={selectedTenant.sellerProvince}>
+                        {selectedTenant.sellerProvince}
+                      </MenuItem>
+                    )}
                   {/* Standard FBR provinces */}
                   {province.map((prov) => (
                     <MenuItem
@@ -1038,485 +1138,653 @@ export default function CreateInvoice() {
                 </Select>
               </FormControl>
             </Box>
+          </Box>
+        </Box>
+        {/* Buyer Detail Section */}
+        <Typography
+          variant="h6"
+          sx={{
+            mb: 2,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            color: "#1976d2",
+            letterSpacing: 1,
+          }}
+        >
+          Buyer Detail
+        </Typography>
+        <Box
+          sx={{
+            border: "1px solid #e3e8ee",
+            borderRadius: 3,
+            p: { xs: 2, sm: 3 },
+            mb: 4,
+            background: "#fff",
+            boxShadow: 1,
+            transition: "box-shadow 0.2s",
+            "&:hover": { boxShadow: 4 },
+          }}
+        >
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+            <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
+              <Autocomplete
+                fullWidth
+                options={buyers}
+                getOptionLabel={(option) =>
+                  option.buyerBusinessName
+                    ? `${option.buyerBusinessName} (${option.buyerNTNCNIC})`
+                    : ""
+                }
+                value={buyers.find((b) => b.id === selectedBuyerId) || null}
+                onChange={(_, newValue) =>
+                  setSelectedBuyerId(newValue ? newValue.id : "")
+                }
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Select Buyer"
+                    variant="outlined"
+                  />
+                )}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                getOptionKey={(option) =>
+                  option.id ||
+                  option.buyerNTNCNIC ||
+                  option.buyerBusinessName ||
+                  option.buyerAddress ||
+                  Math.random()
+                }
+              />
+            </Box>
+          </Box>
 
+          {/* Buyer Details Fields - Only show when a buyer is selected */}
+          {selectedBuyerId && (
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3, mt: 3 }}>
+              {[
+                { label: "Buyer NTN/CNIC", field: "buyerNTNCNIC" },
+                { label: "Buyer Business Name", field: "buyerBusinessName" },
+                { label: "Buyer Address", field: "buyerAddress" },
+              ].map(({ label, field }) => (
+                <Box key={field} sx={{ flex: "1 1 30%", minWidth: "250px" }}>
+                  <TextField
+                    fullWidth
+                    label={label}
+                    value={formData[field]}
+                    onChange={(e) => handleChange(field, e.target.value)}
+                    variant="outlined"
+                    disabled={true}
+                  />
+                </Box>
+              ))}
+
+              <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
+                <FormControl fullWidth>
+                  <InputLabel id="buyer-province-label">
+                    Buyer Province
+                  </InputLabel>
+                  <Select
+                    labelId="buyer-province-label"
+                    value={formData.buyerProvince}
+                    label="Buyer Province"
+                    onChange={(e) =>
+                      handleChange("buyerProvince", e.target.value)
+                    }
+                    disabled={true}
+                  >
+                    {/* Add buyer's province if it's not in the FBR list */}
+                    {formData.buyerProvince &&
+                      !province.find(
+                        (p) => p.stateProvinceDesc === formData.buyerProvince
+                      ) && (
+                        <MenuItem value={formData.buyerProvince}>
+                          {formData.buyerProvince}
+                        </MenuItem>
+                      )}
+                    {/* Standard FBR provinces */}
+                    {province.map((prov) => (
+                      <MenuItem
+                        key={prov.stateProvinceCode}
+                        value={prov.stateProvinceDesc}
+                      >
+                        {prov.stateProvinceDesc}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+
+              <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
+                <FormControl fullWidth>
+                  <InputLabel id="buyer-registration-type-label">
+                    Buyer Registration Type
+                  </InputLabel>
+                  <Select
+                    labelId="buyer-registration-type-label"
+                    value={formData.buyerRegistrationType}
+                    label="Buyer Registration Type"
+                    onChange={(e) =>
+                      handleChange("buyerRegistrationType", e.target.value)
+                    }
+                    disabled={true}
+                  >
+                    <MenuItem value="Registered">Registered</MenuItem>
+                    <MenuItem value="Unregistered">Unregistered</MenuItem>
+                    <MenuItem value="Consumer">Consumer</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+            </Box>
+          )}
+        </Box>
+        {/* Scenario Section */}
+        <Typography
+          variant="h6"
+          sx={{
+            mb: 2,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            color: "#1976d2",
+            letterSpacing: 1,
+          }}
+        >
+          Scenario
+        </Typography>
+        <Box
+          sx={{
+            border: "1px solid #e3e8ee",
+            borderRadius: 3,
+            p: { xs: 2, sm: 3 },
+            mb: 4,
+            background: "#f7fafd",
+            boxShadow: 1,
+            transition: "box-shadow 0.2s",
+            "&:hover": { boxShadow: 4 },
+          }}
+        >
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
             <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
               <FormControl fullWidth>
-                <InputLabel id="buyer-registration-type-label">Buyer Registration Type</InputLabel>
+                <InputLabel id="scenarioId">Scenario</InputLabel>
                 <Select
-                  labelId="buyer-registration-type-label"
-                  value={formData.buyerRegistrationType}
-                  label="Buyer Registration Type"
-                  onChange={(e) => handleChange("buyerRegistrationType", e.target.value)}
-                  disabled={true}
+                  labelId="scenarioId"
+                  name="scenarioId"
+                  value={formData.scenarioId ?? ""}
+                  label="Scenario"
+                  onChange={(e) => handleScenarioChange(e.target.value)}
                 >
-                  <MenuItem value="Registered">Registered</MenuItem>
-                  <MenuItem value="Unregistered">Unregistered</MenuItem>
-                  <MenuItem value="Consumer">Consumer</MenuItem>
+                  <MenuItem value="">
+                    <em>Select a scenario</em>
+                  </MenuItem>
+                  {scenarioData.map((curElem) => (
+                    <MenuItem key={curElem.id} value={curElem.id}>
+                      {curElem.id} - {curElem.description}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
             </Box>
           </Box>
-        )}
-      </Box>
-      {/* Scenario Section */}
-      <Typography
-        variant="h6"
-        sx={{
-          mb: 2,
-          fontWeight: 700,
-          textTransform: "uppercase",
-          color: "#1976d2",
-          letterSpacing: 1,
-        }}
-      >
-        Scenario
-      </Typography>
-      <Box
-        sx={{
-          border: "1px solid #e3e8ee",
-          borderRadius: 3,
-          p: { xs: 2, sm: 3 },
-          mb: 4,
-          background: "#f7fafd",
-          boxShadow: 1,
-          transition: "box-shadow 0.2s",
-          "&:hover": { boxShadow: 4 },
-        }}
-      >
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-          <Box sx={{ flex: "1 1 30%", minWidth: "250px" }}>
-            <FormControl fullWidth>
-              <InputLabel id="scenarioId">Scenario</InputLabel>
-              <Select
-                labelId="scenarioId"
-                name="scenarioId"
-                value={formData.scenarioId ?? ""}
-                label="Scenario"
-                onChange={(e) => handleScenarioChange(e.target.value)}
-              >
-                <MenuItem value="">
-                  <em>Select a scenario</em>
-                </MenuItem>
-                {scenarioData.map((curElem) => (
-                  <MenuItem key={curElem.id} value={curElem.id}>
-                    {curElem.id} - {curElem.description}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-        </Box>
-        {formData.scenarioId && (
-          <Typography
-            variant="body2"
-            sx={{ mt: 1, ml: 2, color: "text.secondary" }}
-          >
-            {scenarioData.find((s) => s.id === formData.scenarioId)?.description ||
-              ""}
-          </Typography>
-        )}
-      </Box>
-      {/* Items Section */}
-      <Typography
-        variant="h6"
-        sx={{
-          mb: 2,
-          fontWeight: 700,
-          textTransform: "uppercase",
-          color: "#1976d2",
-          letterSpacing: 1,
-        }}
-      >
-        Items
-      </Typography>
-      {formData.items.map((item, index) => (
-        <Box
-          key={index}
-          sx={{
-            mb: 4,
-            border: "1px solid #e3e8ee",
-            borderRadius: 3,
-            p: { xs: 2, sm: 3 },
-            boxShadow: 2,
-            background: "#fff",
-            position: "relative",
-            minHeight: "200px",
-            transition: "box-shadow 0.2s, border-color 0.2s",
-            "&:hover": { boxShadow: 6, borderColor: "#1976d2" },
-          }}
-        >
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 2 }}>
-            <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
-              <Autocomplete
-                fullWidth
-                options={hsCodeList}
-                getOptionLabel={(option) => option.hS_CODE}
-                value={
-                  hsCodeList.find((code) => code.hS_CODE === item.hsCode) || null
-                }
-                onChange={(_, newValue) => {
-                  handleItemChange(
-                    index,
-                    "hsCode",
-                    newValue ? newValue.hS_CODE : ""
-                  );
-                  const selectedScenario = scenarioData.find(
-                    (s) => s.id === formData.scenarioId
-                  );
-                  handleItemChange(
-                    index,
-                    "productDescription",
-                    selectedScenario ? selectedScenario.description : ""
-                  );
-                }}
-                renderInput={(params) => (
-                  <TextField {...params} label="HS Code" variant="outlined" />
-                )}
-                isOptionEqualToValue={(option, value) =>
-                  option.hS_CODE === value.hS_CODE
-                }
-                filterOptions={(options, { inputValue }) =>
-                  options.filter((option) =>
-                    option.hS_CODE
-                      .toLowerCase()
-                      .includes(inputValue.toLowerCase())
-                  )
-                }
-              />
-            </Box>
-            <RateSelector
-              key={`RateSelector-${index}`}
-              index={index}
-              item={item}
-              handleItemChange={handleItemChange}
-              transactionTypeId={transactionTypeId}
-              selectedProvince={formData.sellerProvince}
-            />
-            <SROScheduleNumber
-              key={`SROScheduleNumber-${index}`}
-              index={index}
-              item={item}
-              disabled={!item.isSROScheduleEnabled}
-              handleItemChange={handleItemChange}
-              RateId={localStorage.getItem("selectedRateId")}
-              selectedProvince={formData.sellerProvince}
-            />
-            <SROItem
-              key={`SROItem-${index}`}
-              index={index}
-              disabled={!item.isSROItemEnabled}
-              item={item}
-              handleItemChange={handleItemChange}
-              SROId={localStorage.getItem("SROId")}
-            />
-          </Box>
-
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 2 }}>
-            <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
-              <TextField
-                fullWidth
-                label="Product Description"
-                value={item.productDescription || ""}
-                InputProps={{
-                  readOnly: true,
-                }}
-                variant="outlined"
-              />
-            </Box>
-            <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
-              <TextField
-                fullWidth
-                label="Sales Type"
-                type="text"
-                value={item.saleType || ""}
-                onChange={(e) =>
-                  handleItemChange(index, "saleType", e.target.value)
-                }
-                InputProps={{
-                  readOnly: true,
-                }}
-                variant="outlined"
-              />
-            </Box>
-            <UnitOfMeasurement
-              key={`UnitOfMeasurement-${index}`}
-              index={index}
-              item={item}
-              handleItemChange={handleItemChange}
-              hsCode={item.hsCode}
-            />
-          </Box>
-
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
-              <TextField
-                fullWidth
-                label="Unit Price"
-                type="text"
-                value={item.unitPrice ? parseFloat(item.unitPrice).toString() : ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Allow only numbers and decimal points
-                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                    handleItemChange(index, "unitPrice", value);
-                  }
-                }}
-                variant="outlined"
-              />
-            </Box>
-            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
-              <TextField
-                fullWidth
-                label="Qty"
-                type="text"
-                value={item.quantity ? parseInt(item.quantity).toString() : ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Allow only numbers
-                  if (value === '' || /^\d*$/.test(value)) {
-                    handleItemChange(index, "quantity", value);
-                  }
-                }}
-                variant="outlined"
-              />
-            </Box>
-            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
-              <TextField
-                fullWidth
-                label="Retail Price"
-                type="text"
-                value={item.retailPrice ? parseFloat(item.retailPrice).toString() : ""}
-                InputProps={{ readOnly: true }}
-                variant="outlined"
-              />
-            </Box>
-            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
-              <TextField
-                fullWidth
-                label="Value Sales (Excl. ST)"
-                type="text"
-                value={item.valueSalesExcludingST ? parseFloat(item.valueSalesExcludingST).toString() : ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Allow only numbers and decimal points
-                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                    handleItemChange(
-                      index,
-                      "valueSalesExcludingST",
-                      value
-                    );
-                  }
-                }}
-                variant="outlined"
-              />
-            </Box>
-
-            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
-              <TextField
-                fullWidth
-                label="Sales Tax Applicable"
-                type="text"
-                value={item.salesTaxApplicable ? parseFloat(item.salesTaxApplicable).toString() : ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Allow only numbers and decimal points
-                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                    handleItemChange(index, "salesTaxApplicable", value);
-                  }
-                }}
-                variant="outlined"
-              />
-            </Box>
-
-            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
-              <TextField
-                fullWidth
-                label="Total Values"
-                type="text"
-                value={item.totalValues ? parseFloat(item.totalValues).toString() : ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Allow only numbers and decimal points
-                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                    handleItemChange(index, "totalValues", value);
-                  }
-                }}
-                variant="outlined"
-              />
-            </Box>
-          </Box>
-
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mt: 2 }}>
-            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
-              <TextField
-                fullWidth
-                label="ST Withheld at Source"
-                type="text"
-                value={item.salesTaxWithheldAtSource ? parseFloat(item.salesTaxWithheldAtSource).toString() : ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Allow only numbers and decimal points
-                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                    handleItemChange(
-                      index,
-                      "salesTaxWithheldAtSource",
-                      value
-                    );
-                  }
-                }}
-                variant="outlined"
-              />
-            </Box>
-            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
-              <TextField
-                fullWidth
-                label="Extra Tax"
-                type="text"
-                value={item.extraTax ? parseFloat(item.extraTax).toString() : ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Allow only numbers and decimal points
-                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                    handleItemChange(index, "extraTax", value);
-                  }
-                }}
-                variant="outlined"
-              />
-            </Box>
-            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
-              <TextField
-                fullWidth
-                label="Further Tax"
-                type="text"
-                value={item.furtherTax ? parseFloat(item.furtherTax).toString() : ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Allow only numbers and decimal points
-                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                    handleItemChange(index, "furtherTax", value);
-                  }
-                }}
-                variant="outlined"
-              />
-            </Box>
-            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
-              <TextField
-                fullWidth
-                label="FED Payable"
-                type="text"
-                value={item.fedPayable ? parseFloat(item.fedPayable).toString() : ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Allow only numbers and decimal points
-                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                    handleItemChange(index, "fedPayable", value);
-                  }
-                }}
-                variant="outlined"
-              />
-            </Box>
-            <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
-              <TextField
-                fullWidth
-                label="Discount (%)"
-                type="text"
-                value={item.discount ? parseFloat(item.discount).toString() : ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Allow only numbers and decimal points
-                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                    handleItemChange(index, "discount", value);
-                  }
-                }}
-                variant="outlined"
-              />
-            </Box>
-          </Box>
-
-          <Box sx={{ position: "relative", mt: 2, textAlign: "right" }}>
-            <Button
-              variant="contained"
-              color="error"
-              onClick={() => removeItem(index)}
-              sx={{
-                mt: 2,
-                borderRadius: 2,
-                fontWeight: 600,
-                px: 3,
-                boxShadow: 1,
-                transition: "background 0.2s",
-                "&:hover": { background: "#b71c1c" },
-              }}
+          {formData.scenarioId && (
+            <Typography
+              variant="body2"
+              sx={{ mt: 1, ml: 2, color: "text.secondary" }}
             >
-              Remove Item
-            </Button>
-          </Box>
+              {scenarioData.find((s) => s.id === formData.scenarioId)
+                ?.description || ""}
+            </Typography>
+          )}
         </Box>
-      ))}
-      <Box sx={{ display: "flex", justifyContent: "space-between", mt: 4 }}>
-        <Button
-          variant="contained"
-          onClick={addNewItem}
-          color="success"
+        {/* Items Section */}
+        <Typography
+          variant="h6"
           sx={{
-            borderRadius: 2,
+            mb: 2,
             fontWeight: 700,
-            px: 4,
-            py: 1.5,
-            boxShadow: 2,
-            fontSize: 18,
+            textTransform: "uppercase",
+            color: "#1976d2",
             letterSpacing: 1,
-            transition: "background 0.2s",
-            "&:hover": { background: "#388e3c" },
           }}
         >
-          + Add New Item
-        </Button>
-        <Box>
-          <Button
-            onClick={handleSubmitChange}
-            variant="contained"
-            color="primary"
+          Items
+        </Typography>
+        {formData.items.map((item, index) => (
+          <Box
+            key={index}
             sx={{
-              mr: 2,
+              mb: 4,
+              border: "1px solid #e3e8ee",
+              borderRadius: 3,
+              p: { xs: 2, sm: 3 },
+              boxShadow: 2,
+              background: "#fff",
+              position: "relative",
+              minHeight: "200px",
+              transition: "box-shadow 0.2s, border-color 0.2s",
+              "&:hover": { boxShadow: 6, borderColor: "#1976d2" },
+            }}
+          >
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 2 }}>
+              <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
+                <Autocomplete
+                  fullWidth
+                  options={hsCodeList}
+                  getOptionLabel={(option) => option.hS_CODE}
+                  value={
+                    hsCodeList.find((code) => code.hS_CODE === item.hsCode) ||
+                    null
+                  }
+                  onChange={(_, newValue) => {
+                    console.log("HS Code Selection:", newValue);
+                    handleItemChange(
+                      index,
+                      "hsCode",
+                      newValue ? newValue.hS_CODE : ""
+                    );
+                    // Update product description with FBR description only, don't use scenario description
+                    if (newValue && newValue.description) {
+                      console.log(
+                        "Setting FBR Description:",
+                        newValue.description
+                      );
+                      handleItemChange(
+                        index,
+                        "productDescription",
+                        newValue.description
+                      );
+                    } else {
+                      // Clear product description if no FBR description available
+                      console.log(
+                        "Clearing product description - no FBR description available"
+                      );
+                      handleItemChange(index, "productDescription", "");
+                    }
+                  }}
+                  renderInput={(params) => (
+                    <TextField {...params} label="HS Code" variant="outlined" />
+                  )}
+                  isOptionEqualToValue={(option, value) =>
+                    option.hS_CODE === value.hS_CODE
+                  }
+                  filterOptions={(options, { inputValue }) =>
+                    options.filter(
+                      (option) =>
+                        option.hS_CODE
+                          .toLowerCase()
+                          .includes(inputValue.toLowerCase()) ||
+                        (option.description &&
+                          option.description
+                            .toLowerCase()
+                            .includes(inputValue.toLowerCase()))
+                    )
+                  }
+                />
+              </Box>
+              <RateSelector
+                key={`RateSelector-${index}`}
+                index={index}
+                item={item}
+                handleItemChange={handleItemChange}
+                transactionTypeId={transactionTypeId}
+                selectedProvince={formData.sellerProvince}
+              />
+              <SROScheduleNumber
+                key={`SROScheduleNumber-${index}`}
+                index={index}
+                item={item}
+                disabled={!item.isSROScheduleEnabled}
+                handleItemChange={handleItemChange}
+                RateId={localStorage.getItem("selectedRateId")}
+                selectedProvince={formData.sellerProvince}
+              />
+              <SROItem
+                key={`SROItem-${index}`}
+                index={index}
+                disabled={!item.isSROItemEnabled}
+                item={item}
+                handleItemChange={handleItemChange}
+                SROId={localStorage.getItem("SROId")}
+              />
+            </Box>
+
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 2 }}>
+              <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
+                <TextField
+                  fullWidth
+                  label="Product Description"
+                  value={item.productDescription || ""}
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                  variant="outlined"
+                />
+              </Box>
+              <Box sx={{ flex: "1 1 23%", minWidth: "200px" }}>
+                <TextField
+                  fullWidth
+                  label="Sales Type"
+                  type="text"
+                  value={item.saleType || ""}
+                  onChange={(e) =>
+                    handleItemChange(index, "saleType", e.target.value)
+                  }
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                  variant="outlined"
+                />
+              </Box>
+              <UnitOfMeasurement
+                key={`UnitOfMeasurement-${index}`}
+                index={index}
+                item={item}
+                handleItemChange={handleItemChange}
+                hsCode={item.hsCode}
+              />
+            </Box>
+
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+              <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+                <TextField
+                  fullWidth
+                  label="Unit Price"
+                  type="text"
+                  value={
+                    item.unitPrice ? parseFloat(item.unitPrice).toString() : ""
+                  }
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow only numbers and decimal points
+                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                      handleItemChange(index, "unitPrice", value);
+                    }
+                  }}
+                  variant="outlined"
+                />
+              </Box>
+              <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+                <TextField
+                  fullWidth
+                  label="Qty"
+                  type="text"
+                  value={
+                    item.quantity ? parseInt(item.quantity).toString() : ""
+                  }
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow only numbers
+                    if (value === "" || /^\d*$/.test(value)) {
+                      handleItemChange(index, "quantity", value);
+                    }
+                  }}
+                  variant="outlined"
+                />
+              </Box>
+              <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+                <TextField
+                  fullWidth
+                  label="Retail Price"
+                  type="text"
+                  value={
+                    item.retailPrice
+                      ? parseFloat(item.retailPrice).toString()
+                      : ""
+                  }
+                  InputProps={{ readOnly: true }}
+                  variant="outlined"
+                />
+              </Box>
+              <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+                <TextField
+                  fullWidth
+                  label="Value Sales (Excl. ST)"
+                  type="text"
+                  value={
+                    item.valueSalesExcludingST
+                      ? parseFloat(item.valueSalesExcludingST).toString()
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow only numbers and decimal points
+                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                      handleItemChange(index, "valueSalesExcludingST", value);
+                    }
+                  }}
+                  variant="outlined"
+                />
+              </Box>
+
+              <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+                <TextField
+                  fullWidth
+                  label="Sales Tax Applicable"
+                  type="text"
+                  value={
+                    item.salesTaxApplicable
+                      ? parseFloat(item.salesTaxApplicable).toString()
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow only numbers and decimal points
+                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                      handleItemChange(index, "salesTaxApplicable", value);
+                    }
+                  }}
+                  variant="outlined"
+                />
+              </Box>
+
+              <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+                <TextField
+                  fullWidth
+                  label="Total Values"
+                  type="text"
+                  value={
+                    item.totalValues
+                      ? parseFloat(item.totalValues).toString()
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow only numbers and decimal points
+                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                      handleItemChange(index, "totalValues", value);
+                    }
+                  }}
+                  variant="outlined"
+                />
+              </Box>
+            </Box>
+
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mt: 2 }}>
+              <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+                <TextField
+                  fullWidth
+                  label="ST Withheld at Source"
+                  type="text"
+                  value={
+                    item.salesTaxWithheldAtSource
+                      ? parseFloat(item.salesTaxWithheldAtSource).toString()
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow only numbers and decimal points
+                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                      handleItemChange(
+                        index,
+                        "salesTaxWithheldAtSource",
+                        value
+                      );
+                    }
+                  }}
+                  variant="outlined"
+                />
+              </Box>
+              <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+                <TextField
+                  fullWidth
+                  label="Extra Tax"
+                  type="text"
+                  value={
+                    item.extraTax ? parseFloat(item.extraTax).toString() : ""
+                  }
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow only numbers and decimal points
+                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                      handleItemChange(index, "extraTax", value);
+                    }
+                  }}
+                  variant="outlined"
+                />
+              </Box>
+              <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+                <TextField
+                  fullWidth
+                  label="Further Tax"
+                  type="text"
+                  value={
+                    item.furtherTax
+                      ? parseFloat(item.furtherTax).toString()
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow only numbers and decimal points
+                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                      handleItemChange(index, "furtherTax", value);
+                    }
+                  }}
+                  variant="outlined"
+                />
+              </Box>
+              <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+                <TextField
+                  fullWidth
+                  label="FED Payable"
+                  type="text"
+                  value={
+                    item.fedPayable
+                      ? parseFloat(item.fedPayable).toString()
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow only numbers and decimal points
+                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                      handleItemChange(index, "fedPayable", value);
+                    }
+                  }}
+                  variant="outlined"
+                />
+              </Box>
+              <Box sx={{ flex: "1 1 18%", minWidth: "150px" }}>
+                <TextField
+                  fullWidth
+                  label="Discount (%)"
+                  type="text"
+                  value={
+                    item.discount ? parseFloat(item.discount).toString() : ""
+                  }
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow only numbers and decimal points
+                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                      handleItemChange(index, "discount", value);
+                    }
+                  }}
+                  variant="outlined"
+                />
+              </Box>
+            </Box>
+
+            <Box sx={{ position: "relative", mt: 2, textAlign: "right" }}>
+              <Button
+                variant="contained"
+                color="error"
+                onClick={() => removeItem(index)}
+                sx={{
+                  mt: 2,
+                  borderRadius: 2,
+                  fontWeight: 600,
+                  px: 3,
+                  boxShadow: 1,
+                  transition: "background 0.2s",
+                  "&:hover": { background: "#b71c1c" },
+                }}
+              >
+                Remove Item
+              </Button>
+            </Box>
+          </Box>
+        ))}
+        <Box sx={{ display: "flex", justifyContent: "space-between", mt: 4 }}>
+          <Button
+            variant="contained"
+            onClick={addNewItem}
+            color="success"
+            sx={{
               borderRadius: 2,
               fontWeight: 700,
               px: 4,
               py: 1.5,
+              boxShadow: 2,
               fontSize: 18,
               letterSpacing: 1,
-              boxShadow: 2,
               transition: "background 0.2s",
-              "&:hover": { background: "#115293" },
+              "&:hover": { background: "#388e3c" },
             }}
-            disabled={loading}
           >
-            {loading ? (
-              <CircularProgress size={24} color="inherit" />
-            ) : (
-              "Submit"
-            )}
+            + Add New Item
           </Button>
+          <Box>
+            <Button
+              onClick={handleSubmitChange}
+              variant="contained"
+              color="primary"
+              sx={{
+                mr: 2,
+                borderRadius: 2,
+                fontWeight: 700,
+                px: 4,
+                py: 1.5,
+                fontSize: 18,
+                letterSpacing: 1,
+                boxShadow: 2,
+                transition: "background 0.2s",
+                "&:hover": { background: "#115293" },
+              }}
+              disabled={loading}
+            >
+              {loading ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : (
+                "Submit"
+              )}
+            </Button>
+          </Box>
         </Box>
-      </Box>
-      {allLoading && (
-        <Box
-          sx={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            bgcolor: "rgba(255,255,255,0.7)",
-            zIndex: 9999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <CircularProgress size={50} color="primary" />
-        </Box>
-      )}
+        {allLoading && (
+          <Box
+            sx={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
+              bgcolor: "rgba(255,255,255,0.7)",
+              zIndex: 9999,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <CircularProgress size={50} color="primary" />
+          </Box>
+        )}
       </Box>
     </TenantSelectionPrompt>
   );

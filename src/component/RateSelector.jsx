@@ -15,28 +15,81 @@ const RateSelector = ({
   // Function to fetch rate data
   const getRateData = async () => {
     if (!transactionTypeId || !selectedProvince) {
+      console.log("Missing required data:", {
+        transactionTypeId,
+        selectedProvince,
+      });
       setRates([]);
       return null;
     }
     setLoading(true);
     try {
-      const provinceResponseRaw = localStorage.getItem("sellerProvince");
-    
-      console.log("Province Response:", provinceResponseRaw);
-      
-      const provinceResponse = provinceResponseRaw
-      
+      // Get the full province data from localStorage
+      const provinceResponseRaw = localStorage.getItem("provinceResponse");
+
+      console.log("Province Response Raw:", provinceResponseRaw);
+
+      // Parse the province data from localStorage
+      let provinceResponse;
+      try {
+        provinceResponse = provinceResponseRaw
+          ? JSON.parse(provinceResponseRaw)
+          : [];
+      } catch (parseError) {
+        console.error("Error parsing province data:", parseError);
+        provinceResponse = [];
+      }
+
+      // Ensure provinceResponse is an array
+      if (!Array.isArray(provinceResponse)) {
+        console.error("Province response is not an array:", provinceResponse);
+        setRates([]);
+        return;
+      }
+
+      console.log(
+        "Available provinces:",
+        provinceResponse.map((p) => ({
+          desc: p.stateProvinceDesc,
+          code: p.stateProvinceCode,
+        }))
+      );
+      console.log("Looking for province:", selectedProvince);
+
       const selectedProvinceObj = provinceResponse.find(
         (prov) => prov.stateProvinceDesc === selectedProvince
       );
-      
+
+      if (!selectedProvinceObj) {
+        console.error("Selected province not found in province data");
+        console.log(
+          "Available province descriptions:",
+          provinceResponse.map((p) => p.stateProvinceDesc)
+        );
+        setRates([]);
+        return;
+      }
+
+      const stateProvinceCode = selectedProvinceObj.stateProvinceCode;
+      console.log("Found province code:", stateProvinceCode);
 
       const response = await fetchData(
         `pdi/v2/SaleTypeToRate?date=24-Feb-2024&transTypeId=${transactionTypeId}&originationSupplier=${stateProvinceCode}`
       );
       console.log("Rate Response:", response);
       console.log("Transaction Type ID:", transactionTypeId);
-      setRates(response || []);
+      console.log("Response type:", typeof response);
+      console.log("Response is array:", Array.isArray(response));
+
+      if (Array.isArray(response)) {
+        setRates(response);
+      } else if (response && typeof response === "object") {
+        // Handle case where response might be wrapped in an object
+        const ratesArray = response.data || response.rates || response;
+        setRates(Array.isArray(ratesArray) ? ratesArray : []);
+      } else {
+        setRates([]);
+      }
     } catch (error) {
       console.error("Error fetching rates:", error);
       setRates([]);
